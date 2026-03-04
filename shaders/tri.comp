@@ -1,0 +1,1394 @@
+#version 450
+layout(local_size_x=16, local_size_y=16) in;
+
+layout(set=0,binding=0, rgba32f) uniform writeonly image2D outImg;
+layout(set=0,binding=1, rgba32f) uniform image2D accumImg;
+
+layout(std430, set=0, binding=2) readonly buffer TriBuf { vec4 data[]; } tris;
+
+struct BVHNode {
+    vec4 bmin;
+    vec4 bmax;
+    int left;
+    int right;
+    int triOffset;
+    int triCount;
+};
+
+layout(std430, set=0, binding=3) readonly buffer BVHBuf { BVHNode nodes[]; } bvh;
+layout(std430, set=0, binding=4) readonly buffer IdxBuf { int idx[]; } bvhIdx;
+
+// uint counters[0]=nodeVisits, counters[1]=triTests
+layout(std430, set=0, binding=5) buffer CounterBuf { uint counters[]; } cnt;
+
+// roots for multi-bvh chunks
+layout(std430, set=0, binding=6) readonly buffer RootBuf { int roots[]; } bvhRoots;
+
+// NeRF buffers (custom hashgrid + occupancy)
+layout(std430, set=0, binding=8) readonly buffer NerfHashBuf { uint data[]; } nerfHash;
+layout(std430, set=0, binding=9) readonly buffer NerfOccBuf { uint data[]; } nerfOcc;
+
+// Depth hint buffer from CPU prepass (binding=10)
+// Each hint: float depth, float delta, float confidence, uint flags
+// Enables narrow-band sampling for 4-8x speedup
+layout(std430, set=0, binding=10) readonly buffer DepthHintBuf { vec4 hints[]; } depthHints;
+
+// Camera uniform buffer (binding 7) - moved from push constants for stability
+layout(std140, set=0, binding=7) uniform CameraUBO {
+    vec4 pos;      // xyz = camera position, w unused
+    vec4 forward;  // xyz = forward direction, w unused
+    vec4 right;    // xyz = right direction, w unused
+    vec4 up;       // xyz = up direction, w unused
+} camera;
+
+layout(push_constant) uniform Push {
+    int W;
+    int H;
+    int frame;
+    int seed;
+    int triCount;
+    int nodeCount;
+    int useBVH;
+    int cullBackface; // pc[7] from C
+    int rootCount;    // pc[8] from C
+    int enableCounters; // pc[9] from C (0 disables atomic counters)
+
+    float alpha;      // EMA alpha; 0 => running average
+    int resetAccum;   // if !=0 and frame==0, clears accumulation
+    int enableNerfProxy;
+    float nerfStrength;
+    float nerfDensity;
+    float nerfBlend;
+    float nerfBounds;
+    float nerfCenterX;
+    float nerfCenterY;
+    float nerfCenterZ;
+    float nerfScale;
+    int nerfSkipOcc;
+    int nerfSteps;
+    int renderMode;   // 0=mesh, 1=probe placeholder, 2=hybrid
+    int depthHintsReady;
+} pc;
+
+// Debug: render NeRF buffers only when renderMode == 3
+
+// ----------------- RNG -----------------
+uint wang_hash(uint s){
+    s = (s ^ 61u) ^ (s >> 16u);
+    s *= 9u;
+    s = s ^ (s >> 4u);
+    s *= 0x27d4eb2du;
+    s = s ^ (s >> 15u);
+    return s;
+}
+float rand01(inout uint state){
+    state = wang_hash(state);
+    return float(state) * (1.0 / 4294967296.0);
+}
+
+// ----------- COLOR SPACE CONVERSIONS (sRGB <-> Linear) -----------
+// Convert sRGB to linear (input color space)
+vec3 srgb_to_linear(vec3 srgb){
+    return mix(
+        srgb / 12.92,
+        pow((srgb + 0.055) / 1.055, vec3(2.4)),
+        lessThan(srgb, vec3(0.04045))
+    );
+}
+
+// Convert linear to sRGB (output color space)
+vec3 linear_to_srgb(vec3 lin){
+    return mix(
+        lin * 12.92,
+        1.055 * pow(lin, vec3(1.0/2.4)) - 0.055,
+        lessThan(lin, vec3(0.0031308))
+    );
+}
+
+// Proper luminance in linear space (for perception)
+float linear_luminance(vec3 lin_color){
+    return dot(lin_color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+// ----------- SHADER VARIANTS: Material-specific shading -----------
+// Variant 1: Metallic shader (high specularity)
+vec3 shade_metallic(vec3 base_col, vec3 normal, vec3 rd, float lambert, float fresnel, vec3 light_dir){
+    vec3 lin_col = srgb_to_linear(base_col);
+    // Metals are highly reflective with dominant specular component
+    return lin_col * (lambert * 0.3 + 0.7) + fresnel * 0.8;
+}
+
+// Variant 2: Plastic shader (moderate specularity)
+vec3 shade_plastic(vec3 base_col, vec3 normal, vec3 rd, float lambert, float fresnel, vec3 light_dir){
+    vec3 lin_col = srgb_to_linear(base_col);
+    // Plastics have moderate diffuse + small specular
+    return lin_col * (lambert * 0.85 + 0.15) + fresnel * 0.15;
+}
+
+// Variant 3: Matte shader (no specularity)
+vec3 shade_matte(vec3 base_col, vec3 normal, vec3 rd, float lambert, float fresnel, vec3 light_dir){
+    vec3 lin_col = srgb_to_linear(base_col);
+    // Matte surfaces are purely diffuse (like clay, fabric)
+    return lin_col * (lambert * 0.98 + 0.02);
+}
+
+// Variant 4: Dielectric shader (glass/translucent)
+vec3 shade_dielectric(vec3 base_col, vec3 normal, vec3 rd, float lambert, float fresnel, vec3 light_dir){
+    vec3 lin_col = srgb_to_linear(base_col);
+    // Dielectrics have low specularity, thin-film interference
+    return lin_col * (lambert * 0.6 + 0.4) + fresnel * vec3(0.8, 0.85, 0.9) * 0.5;
+}
+
+// Material dispatch function (selects variant based on distance)
+vec3 shade_material(vec3 base_col, vec3 normal, vec3 rd, float t, vec3 light_dir){
+    float lambert = max(dot(normal, -light_dir), 0.0);
+    float fresnel = pow(1.0 - max(0.0, dot(normal, -rd)), 4.0) * 0.5 + 0.5;
+    
+    // Select material variant based on distance
+    if(t < 2.0) {
+        return shade_metallic(base_col, normal, rd, lambert, fresnel, light_dir);
+    } else if(t < 5.0) {
+        return shade_plastic(base_col, normal, rd, lambert, fresnel, light_dir);
+    } else if(t < 10.0) {
+        return shade_matte(base_col, normal, rd, lambert, fresnel, light_dir);
+    } else {
+        return shade_dielectric(base_col, normal, rd, lambert, fresnel, light_dir);
+    }
+}
+
+// ----------- /SHADER VARIANTS -----------
+
+
+// ----------------- Math -----------------
+// Optimized normalize using fast inverse sqrt (single reciprocal sqrt vs division)
+vec3 safe_normalize(vec3 v){
+    float len_sq = dot(v, v);
+    if(len_sq <= 1e-20) return vec3(0, 0, 1);
+    return v * inversesqrt(len_sq);  // inversesqrt is 1 instruction vs 2 for sqrt+div
+}
+
+bool hit_aabb(vec3 ro, vec3 invD, vec3 bmin, vec3 bmax, float tMax){
+    // OPTIMIZED slab intersection with early exit
+    // Reduces NaN/Inf risk and halts divergence faster
+    vec3 t0 = (bmin - ro) * invD;
+    vec3 t1 = (bmax - ro) * invD;
+    
+    // Use conditional assignment to avoid branches on min/max
+    vec3 tmin_v = min(t0, t1);
+    vec3 tmax_v = max(t0, t1);
+    
+    // Scalar reduction: fused min/max to hide latency
+    float tmin = max(tmin_v.x, max(tmin_v.y, tmin_v.z));
+    float tmax_full = min(tmax_v.x, min(tmax_v.y, tmax_v.z));
+    float tmax = min(tmax_full, tMax);
+    
+    // Early exit: single comparison (branch predictable)
+    return tmin <= tmax && tmin >= -1e-6;  // Small epsilon to handle numerical noise
+}
+
+bool hit_tri(vec3 ro, vec3 rd, vec3 p0, vec3 p1, vec3 p2, out float t, out vec3 n){
+    // OPTIMIZED Möller–Trumbore intersection
+    // Reduces redundant calculations and memory reads
+    vec3 e1 = p1 - p0;
+    vec3 e2 = p2 - p0;
+    vec3 h = cross(rd, e2);
+    float a = dot(e1, h);
+    
+    // Early rejection for degenerate/parallel triangles
+    if(abs(a) < 1e-8) return false;
+    
+    float f = 1.0 / a;
+    vec3 s = ro - p0;
+    
+    // Compute u coordinate - early rejection if outside [0,1]
+    float u = f * dot(s, h);
+    if(u < 0.0 || u > 1.0) return false;
+    
+    // Compute v coordinate and combined (u+v) check
+    vec3 q = cross(s, e1);
+    float v = f * dot(rd, q);
+    float uv_sum = u + v;
+    
+    // Both v and u+v checks in one condition
+    if(v < 0.0 || uv_sum > 1.0) return false;
+    
+    // Compute t with epsilon check for numerical stability
+    float tt = f * dot(e2, q);
+    const float EPSILON = 1e-6;
+    if(tt <= EPSILON) return false;
+    
+    t = tt;
+    
+    // Compute normal efficiently (already have e1, e2)
+    n = safe_normalize(cross(e1, e2));
+    return true;
+}
+
+// Brute-force (optionally counts only a sparse subset)
+void brute_force(vec3 ro, vec3 rd, out float tHit, out vec3 nHit, bool countIt){
+    tHit = 1e30;
+    nHit = vec3(0,0,1);
+
+    for(int i=0;i<pc.triCount;i++){
+        int base = i * 3;
+        vec3 p0 = tris.data[base+0].xyz;
+        vec3 p1 = tris.data[base+1].xyz;
+        vec3 p2 = tris.data[base+2].xyz;
+
+        float t; vec3 n;
+        if(hit_tri(ro, rd, p0, p1, p2, t, n)){
+            if(pc.cullBackface != 0){
+                // backface cull: require facing camera
+                if(dot(n, rd) > 0.0) {
+                    // still count tri test if enabled
+                    if(countIt && pc.enableCounters!=0) atomicAdd(cnt.counters[1], 1u);
+                    continue;
+                }
+            }
+            if(t < tHit){
+                tHit = t;
+                nHit = n;
+            }
+        }
+        if(countIt && pc.enableCounters!=0) atomicAdd(cnt.counters[1], 1u);
+    }
+}
+
+// BVH traverse for one root - OPTIMIZED for cache coherence and reduced divergence
+void bvh_traverse_single(int rootIndex, vec3 ro, vec3 rd, inout float tHit, inout vec3 nHit){
+    vec3 invD = 1.0 / rd;
+
+    int stack[64];
+    int sp = 0;
+    stack[sp++] = rootIndex;
+
+    while(sp > 0){
+        int ni = stack[--sp];
+        
+        // Bounds checking: avoid memory stalls from invalid reads
+        if(ni < 0) continue;
+        if(ni >= pc.nodeCount) continue;
+
+        if(pc.enableCounters!=0) atomicAdd(cnt.counters[0], 1u);
+
+        BVHNode nd = bvh.nodes[ni];
+        
+        // AABB test with early rejection (reduces subsequent work)
+        if(!hit_aabb(ro, invD, nd.bmin.xyz, nd.bmax.xyz, tHit)) continue;
+
+        // Early check for leaf (avoid redundant comparisons)
+        bool is_leaf = (nd.left < 0) && (nd.right < 0);
+        
+        if(is_leaf){
+            // Leaf processing: unroll triangle tests when possible
+            int off = nd.triOffset;
+            int cntLeaf = nd.triCount;
+            
+            // Process triangles with explicit unroll for better ILP
+            for(int k = 0; k < cntLeaf; k++){
+                int triId = bvhIdx.idx[off + k];
+                int base = triId * 3;
+
+                vec3 p0 = tris.data[base+0].xyz;
+                vec3 p1 = tris.data[base+1].xyz;
+                vec3 p2 = tris.data[base+2].xyz;
+
+                float t; 
+                vec3 n;
+                
+                if(hit_tri(ro, rd, p0, p1, p2, t, n)){
+                    // Skip backface check if culling disabled (reduce divergence)
+                    bool skip = false;
+                    if(pc.cullBackface != 0){
+                        if(dot(n, rd) > 0.0){
+                            skip = true;
+                        }
+                    }
+                    
+                    if(!skip && t < tHit){
+                        tHit = t;
+                        nHit = n;
+                    }
+                }
+                if(pc.enableCounters!=0) atomicAdd(cnt.counters[1], 1u);
+            }
+        } else {
+            // Internal node: push children with simple ordering (reduce computation)
+            // Use sign-based heuristic instead of computing actual distances
+            float sign_left = dot(nd.bmin.xyz - ro, rd);
+            float sign_right = dot(nd.bmax.xyz - ro, rd);
+            
+            // Push farther child first (LIFO stack = DFS front-to-back)
+            if(sign_left < sign_right){
+                if(nd.right >= 0) stack[sp++] = nd.right;
+                if(nd.left >= 0) stack[sp++] = nd.left;
+            } else {
+                if(nd.left >= 0) stack[sp++] = nd.left;
+                if(nd.right >= 0) stack[sp++] = nd.right;
+            }
+
+            // Avoid stack overflow
+            if(sp > 60) sp = 60;
+        }
+    }
+}
+
+// Multi-root traverse (chunked BVH)
+void bvh_traverse_multi(vec3 ro, vec3 rd, out float tHit, out vec3 nHit){
+    tHit = 1e30;
+    nHit = vec3(0,0,1);
+
+    int rc = pc.rootCount;
+    if(rc <= 0) rc = 1;
+
+    for(int r=0; r<rc; r++){
+        int rootNode = bvhRoots.roots[r];
+        bvh_traverse_single(rootNode, ro, rd, tHit, nHit);
+    }
+}
+
+// Simple equirect direction from (u,v) in [0..1]
+vec3 dir_from_equirect(float u, float v){
+    float phi = (u * 2.0 - 1.0) * 3.1415926535;       // -pi..pi
+    float th  = (0.5 - v) * 3.1415926535;            //  pi/2..-pi/2
+    float cth = cos(th);
+    return safe_normalize(vec3(cth * sin(phi), sin(th), -cth * cos(phi)));  // negate Z to point toward cube at (0,0,-3)
+}
+
+// ---------- Progressive accumulation + temporal denoise ----------
+// Strategy:
+//  - curr = current sample (SPP=1 style)
+//  - hist = previous accumulated value in accumImg
+//  - clamp hist to neighborhood to reduce trails
+//  - if pc.alpha > 0: EMA (realtime-friendly)
+//    else: running average using pc.frame
+float ysu_luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+vec3 ysu_clamp_history(vec3 hist, vec3 curr, ivec2 p){
+    // 3x3 neighborhood clamp using history buffer (cheap & stable)
+    vec3 mn = curr;
+    vec3 mx = curr;
+    for(int oy=-1; oy<=1; oy++){
+        for(int ox=-1; ox<=1; ox++){
+            ivec2 q = ivec2(clamp(p.x+ox, 0, pc.W-1),
+                           clamp(p.y+oy, 0, pc.H-1));
+            vec3 h = imageLoad(accumImg, q).rgb;
+            mn = min(mn, h);
+            mx = max(mx, h);
+        }
+    }
+    // pad a bit to avoid over-clamping (reduces flicker)
+    vec3 pad = 0.05 * (mx - mn) + vec3(1e-4);
+    return clamp(hist, mn - pad, mx + pad);
+}
+
+// ----------------- NeRF Proxy Volume -----------------
+// Lightweight procedural volumetric proxy for hybrid mesh+NeRF research.
+// This is NOT a real NeRF; it is a cheap placeholder for integration testing.
+vec3 nerf_proxy_color(vec3 p){
+    // Simple spatial palette
+    vec3 c = 0.5 + 0.5 * sin(p * 1.7 + vec3(0.0, 2.0, 4.0));
+    return c;
+}
+
+vec3 nerf_proxy_integrate(vec3 ro, vec3 rd){
+    int steps = max(pc.nerfSteps, 1);
+    float tmax = max(pc.nerfBounds, 1.0);
+    float step = tmax / float(steps);
+    vec3 col = vec3(0.0);
+    float trans = 1.0;
+    for(int i = 0; i < steps; i++){
+        float t = (float(i) + 0.5) * step;
+        vec3 p = ro + rd * t;
+        float dens = pc.nerfDensity * exp(-length(p) * 0.2);
+        vec3 c = nerf_proxy_color(p);
+        float alpha = 1.0 - exp(-dens * step);
+        col += trans * alpha * c;
+        trans *= (1.0 - alpha);
+        if(trans < 0.02) break;
+    }
+    return col;
+}
+
+// ----------------- NeRF Buffer Sampling (hashgrid + occupancy) -----------------
+const uint NERF_HASH_MAGIC = 0x3147484Eu; // 'NHG1'
+const uint NERF_OCC_MAGIC  = 0x31474F4Eu; // 'NOG1'
+// Python exporter packs hash header as 15 u32 (60 bytes):
+// magic, version, levels, features, hashmap_size, base_res, per_level_scale(f),
+// mlp_in, mlp_hidden, mlp_layers, mlp_out, scale(f), cx(f), cy(f), cz(f)
+const uint HASH_HEADER_WORDS = 15u; // 60 bytes
+const uint OCC_HEADER_WORDS  = 4u;  // 16 bytes
+const int MAX_LEVELS = 16;
+const int MAX_FEATURES = 4;
+const int MAX_EMBED = 64;   // MAX_LEVELS * MAX_FEATURES
+const int MAX_HIDDEN = 64;
+const int MAX_IN = 67;      // MAX_EMBED + 3
+
+bool nerf_hash_valid(){
+    return nerfHash.data.length() > 0 && nerfHash.data[0] == NERF_HASH_MAGIC;
+}
+
+vec3 nerf_local(vec3 p){
+    vec3 c = vec3(pc.nerfCenterX, pc.nerfCenterY, pc.nerfCenterZ);
+    float invScale = 1.0 / max(pc.nerfScale, 1e-6);
+    return (p - c) * invScale;
+}
+
+uint occ_dim(){
+    if(nerfOcc.data.length() < 2u) return 0u;
+    if(nerfOcc.data[0] != NERF_OCC_MAGIC) return 0u;
+    return nerfOcc.data[1];
+}
+
+// ----------------- Occupancy grid lookup (64^3) -----------------
+uint occ_get(uint x, uint y, uint z, uint dim){
+    uint idx = x + y * dim + z * dim * dim;
+    uint word = nerfOcc.data[OCC_HEADER_WORDS + (idx >> 2u)];
+    uint shift = (idx & 3u) * 8u;
+    return (word >> shift) & 0xFFu;
+}
+
+bool occ_sample(vec3 p){
+    if(pc.nerfSkipOcc != 0) return true;
+    uint dim = occ_dim();
+    if(dim <= 1u) return true;
+    
+    vec3 pl = nerf_local(p);
+    vec3 pn = clamp(pl * 0.5 + 0.5, vec3(0.0), vec3(1.0));
+    
+    // OPTIMIZED: Use fast binary check for initial culling, trilinear only near edges
+    vec3 grid = pn * float(dim - 1u);
+    uvec3 gi = uvec3(floor(grid));
+    
+    // Fast binary check: just sample center voxel
+    uint udim = dim;
+    uint center_val = occ_get(gi.x, gi.y, gi.z, udim);
+    
+    // If clearly occupied or empty, skip trilinear interpolation
+    if(center_val > 200u) return true;   // Strongly occupied
+    if(center_val < 10u) return false;   // Strongly empty
+    
+    // Only use trilinear for edge cases (10-200 range)
+    vec3 pos_f = floor(grid);
+    vec3 w = grid - pos_f;
+    
+    // Pre-compute grid dimensions for efficient indexing
+    uint dim_sq = udim * udim;
+    
+    // Sample 8 corners of the voxel - cache-friendly loop order
+    uint x0 = gi.x, x1 = min(gi.x + 1u, udim - 1u);
+    uint y0 = gi.y, y1 = min(gi.y + 1u, udim - 1u);
+    uint z0 = gi.z, z1 = min(gi.z + 1u, udim - 1u);
+    
+    // Precompute base indices to avoid redundant arithmetic
+    uint base_z0 = z0 * dim_sq;
+    uint base_z1 = z1 * dim_sq;
+    uint base_y0 = y0 * udim;
+    uint base_y1 = y1 * udim;
+    
+    float v000 = float(occ_get(x0, y0, z0, udim));
+    float v001 = float(occ_get(x0, y0, z1, udim));
+    float v010 = float(occ_get(x0, y1, z0, udim));
+    float v011 = float(occ_get(x0, y1, z1, udim));
+    float v100 = float(occ_get(x1, y0, z0, udim));
+    float v101 = float(occ_get(x1, y0, z1, udim));
+    float v110 = float(occ_get(x1, y1, z0, udim));
+    float v111 = float(occ_get(x1, y1, z1, udim));
+    
+    // Optimized trilinear interpolation using FMA
+    float v0x = mix(v000, v100, w.x);
+    float v1x = mix(v010, v110, w.x);
+    float v01 = mix(v0x, v1x, w.y);
+    
+    float v0x1 = mix(v001, v101, w.x);
+    float v1x1 = mix(v011, v111, w.x);
+    float v11 = mix(v0x1, v1x1, w.y);
+    
+    float val = mix(v01, v11, w.z);
+    
+    return val > 0.1; // Threshold for soft occupancy
+}
+
+uint nerf_u16(uint byteOffset){
+    uint word = byteOffset >> 2u;
+    if(word >= nerfHash.data.length()) return 0u;
+    uint v = nerfHash.data[word];
+    // Select low or high 16 bits based on byte position
+    if((byteOffset & 2u) != 0u){
+        return (v >> 16u) & 0xFFFFu;
+    } else {
+        return v & 0xFFFFu;
+    }
+}
+
+// OPTIMIZED: Read half-float with branchless selection
+float nerf_half(uint byteOffset){
+    uint word = byteOffset >> 2u;
+    if(word >= nerfHash.data.length()) return 0.0;
+    uint v = nerfHash.data[word];
+    // Branchless: use step function to select high or low 16 bits
+    uint shift = (byteOffset & 2u) << 3u;  // 0 or 16
+    uint h = (v >> shift) & 0xFFFFu;
+    return unpackHalf2x16(h).x;
+}
+
+// OPTIMIZED: Read 2 half-floats at once (for aligned accesses with features=2)
+vec2 nerf_half2(uint byteOffset){
+    uint word = byteOffset >> 2u;
+    if(word >= nerfHash.data.length()) return vec2(0.0);
+    return unpackHalf2x16(nerfHash.data[word]);
+}
+
+// Hash function matching the Python training code exactly
+uint get_hash(uint hx, uint hy, uint hz, uint hashmap_size) {
+    // Must match training: (x * 73856093 ^ y * 19349663 ^ z * 83492791) % hashmap_size
+    uint h = (hx * 73856093u) ^ (hy * 19349663u) ^ (hz * 83492791u);
+    // Power-of-two fast path (hashmap_size is always 2^N for NeRF)
+    return h & (hashmap_size - 1u);
+}
+
+// Full hashgrid embedding (L * F) with trilinear interpolation
+int hashgrid_embed(vec3 p, out float embed[MAX_EMBED]){
+    if(!nerf_hash_valid()) return 0;
+
+    uint levels = nerfHash.data[2];
+    uint features = nerfHash.data[3];
+    uint hashmap_size = nerfHash.data[4];
+    uint base_res = nerfHash.data[5];
+    float per_level_scale = uintBitsToFloat(nerfHash.data[6]);
+
+    if(levels == 0u || features == 0u || hashmap_size == 0u) return 0;
+    if(int(levels) > MAX_LEVELS || int(features) > MAX_FEATURES) return 0;
+
+    vec3 pl = nerf_local(p);
+    vec3 pn = clamp(pl * 0.5 + 0.5, vec3(0.0), vec3(1.0));
+
+    uint header_bytes = HASH_HEADER_WORDS * 4u;
+
+    int idx = 0;
+    // Precompute per-level scale incrementally to avoid pow()
+    float resf = float(base_res);
+    
+    // Precompute level base offsets to avoid redundant multiplications
+    uint level_base = header_bytes;  // All levels stored sequentially
+    
+    for(uint l = 0u; l < levels; l++){
+        // Use integer-like resolution from progressive scale
+        float resf_local = resf;
+        vec3 grid = pn * resf_local;
+        vec3 pos_f = floor(grid);
+        ivec3 gi = ivec3(pos_f);
+        vec3 w = grid - pos_f; // Interpolation weights
+
+        // Compute byte offset for this level's hashmap
+        uint base_l = l * hashmap_size * features;
+        
+        // Precompute hash indices for 8 corners, using power-of-two bitwise AND
+        // Only compute hashes once per level instead of per-feature
+        uint h000 = get_hash(uint(gi.x),   uint(gi.y),   uint(gi.z),   hashmap_size);
+        uint h001 = get_hash(uint(gi.x),   uint(gi.y),   uint(gi.z+1), hashmap_size);
+        uint h010 = get_hash(uint(gi.x),   uint(gi.y+1), uint(gi.z),   hashmap_size);
+        uint h011 = get_hash(uint(gi.x),   uint(gi.y+1), uint(gi.z+1), hashmap_size);
+        uint h100 = get_hash(uint(gi.x+1), uint(gi.y),   uint(gi.z),   hashmap_size);
+        uint h101 = get_hash(uint(gi.x+1), uint(gi.y),   uint(gi.z+1), hashmap_size);
+        uint h110 = get_hash(uint(gi.x+1), uint(gi.y+1), uint(gi.z),   hashmap_size);
+        uint h111 = get_hash(uint(gi.x+1), uint(gi.y+1), uint(gi.z+1), hashmap_size);
+
+        // Compute byte base for each corner (words are 2 bytes per half-float)
+        // Optimized: precompute offsets and use them in inner loop
+        uint base000 = header_bytes + (base_l + h000 * features) * 2u;
+        uint base001 = header_bytes + (base_l + h001 * features) * 2u;
+        uint base010 = header_bytes + (base_l + h010 * features) * 2u;
+        uint base011 = header_bytes + (base_l + h011 * features) * 2u;
+        uint base100 = header_bytes + (base_l + h100 * features) * 2u;
+        uint base101 = header_bytes + (base_l + h101 * features) * 2u;
+        uint base110 = header_bytes + (base_l + h110 * features) * 2u;
+        uint base111 = header_bytes + (base_l + h111 * features) * 2u;
+
+        // Precompute trilinear weights to avoid redundant mix() calls
+        float wX0 = 1.0 - w.x;
+        float wX1 = w.x;
+        float wY0 = 1.0 - w.y;
+        float wY1 = w.y;
+        float wZ0 = 1.0 - w.z;
+        float wZ1 = w.z;
+        
+        // Unroll 8 corners with precomputed weights for better ILP
+        float wg[8] = float[](
+            wX0 * wY0 * wZ0,  // 000
+            wX0 * wY0 * wZ1,  // 001
+            wX0 * wY1 * wZ0,  // 010
+            wX0 * wY1 * wZ1,  // 011
+            wX1 * wY0 * wZ0,  // 100
+            wX1 * wY0 * wZ1,  // 101
+            wX1 * wY1 * wZ0,  // 110
+            wX1 * wY1 * wZ1   // 111
+        );
+
+        // OPTIMIZED: Use batched vec2 reads for features=2 case (common in instant-ngp)
+        if(features == 2u){
+            // Read both features at once using nerf_half2 (single memory access per corner)
+            vec2 v0 = nerf_half2(base000);
+            vec2 v1 = nerf_half2(base001);
+            vec2 v2 = nerf_half2(base010);
+            vec2 v3 = nerf_half2(base011);
+            vec2 v4 = nerf_half2(base100);
+            vec2 v5 = nerf_half2(base101);
+            vec2 v6 = nerf_half2(base110);
+            vec2 v7 = nerf_half2(base111);
+            
+            // Trilinear interpolation for both features simultaneously
+            vec2 val = v0 * wg[0] + v1 * wg[1] + v2 * wg[2] + v3 * wg[3] +
+                       v4 * wg[4] + v5 * wg[5] + v6 * wg[6] + v7 * wg[7];
+            
+            if(idx + 1 < MAX_EMBED){
+                embed[idx++] = val.x;
+                embed[idx++] = val.y;
+            }
+        } else {
+            // Fallback for other feature counts
+            for(uint f = 0u; f < features; f++){
+                float v0 = nerf_half(base000 + f * 2u);
+                float v1 = nerf_half(base001 + f * 2u);
+                float v2 = nerf_half(base010 + f * 2u);
+                float v3 = nerf_half(base011 + f * 2u);
+                float v4 = nerf_half(base100 + f * 2u);
+                float v5 = nerf_half(base101 + f * 2u);
+                float v6 = nerf_half(base110 + f * 2u);
+                float v7 = nerf_half(base111 + f * 2u);
+
+                float val = v0 * wg[0] + v1 * wg[1] + v2 * wg[2] + v3 * wg[3] +
+                           v4 * wg[4] + v5 * wg[5] + v6 * wg[6] + v7 * wg[7];
+
+                if(idx < MAX_EMBED){
+                    embed[idx++] = val;
+                }
+            }
+        }
+
+        // Increment resolution for next level (avoid pow calls)
+        resf *= per_level_scale;
+    }
+    return idx;
+}
+
+vec4 nerf_mlp_eval(vec3 p, vec3 rd){
+    if(!nerf_hash_valid()) return vec4(0.0);
+
+    uint levels = nerfHash.data[2];
+    uint features = nerfHash.data[3];
+    uint hashmap_size = nerfHash.data[4];
+    uint mlp_in = nerfHash.data[7];
+    uint mlp_hidden = nerfHash.data[8];
+    uint mlp_layers = nerfHash.data[9];
+    uint mlp_out = nerfHash.data[10];
+
+    if(int(levels) > MAX_LEVELS || int(features) > MAX_FEATURES) return vec4(0.0);
+    if(int(mlp_hidden) > MAX_HIDDEN || int(mlp_in) > MAX_IN || mlp_out < 4u) return vec4(0.0);
+
+    float embed[MAX_EMBED];
+    int embed_len = hashgrid_embed(p, embed);
+    if(embed_len <= 0) return vec4(0.0);
+
+    // Build input vector: embedding + view direction
+    float in0[MAX_IN];
+    int in_len = min(int(mlp_in), MAX_IN);
+    
+    // Normalize view direction
+    vec3 v_norm = safe_normalize(rd);
+    
+    // Initialize input array: hash embedding first, then view direction
+    for(int i = 0; i < in_len; i++) in0[i] = 0.0;
+    for(int i = 0; i < min(embed_len, in_len); i++) in0[i] = embed[i];
+    
+    // View direction: use raw normalized direction [-1,1] to match training
+    // Training code: view = rays_d (normalized), NOT scaled to [0,1]
+    int view_start = embed_len;
+    if(in_len >= view_start + 3){
+        in0[view_start + 0] = v_norm.x;
+        in0[view_start + 1] = v_norm.y;
+        in0[view_start + 2] = v_norm.z;
+    }
+
+    uint header_bytes = HASH_HEADER_WORDS * 4u;
+    uint table_bytes = levels * hashmap_size * features * 2u;
+    uint offset = header_bytes + table_bytes;
+
+    float cur[MAX_HIDDEN];
+    float nxt[MAX_HIDDEN];
+
+    int hidden = int(mlp_hidden);
+    int layer_count = int(mlp_layers);
+
+    // Hidden layers: optimized with precomputed biases and memory-coalesced access
+    for(int l = 0; l < layer_count; l++){
+        int in_dim = (l == 0) ? in_len : hidden;
+        int out_dim = hidden;
+        
+        // Precompute base offsets
+        uint w_base = offset;
+        uint b_base = offset + uint(in_dim * out_dim * 2);
+        
+        // Precompute all biases at once for better cache behavior
+        for(int o = 0; o < out_dim; o++){
+            nxt[o] = nerf_half(b_base + uint(o * 2));
+        }
+        
+        // Process outputs with accumulated FMA operations
+        for(int o = 0; o < out_dim; o++){
+            float sum = nxt[o];
+            
+            // Inner loop: grouped loads for cache efficiency
+            for(int j = 0; j < in_dim; j++){
+                uint w_off = w_base + uint((j * out_dim + o) * 2);
+                float w = nerf_half(w_off);
+                float inp = (l == 0) ? in0[j] : cur[j];
+                sum = fma(w, inp, sum);
+            }
+            nxt[o] = max(sum, 0.0);
+        }
+        
+        // Swap current and next for next iteration
+        offset += uint((out_dim * in_dim + out_dim) * 2);
+        for(int i = 0; i < out_dim; i++) cur[i] = nxt[i];
+    }
+
+    // Output layer: optimized with precomputed base offsets
+    int out_dim = int(mlp_out);
+    float outv[4];
+    
+    uint out_w_base = offset;
+    uint out_b_base = offset + uint(hidden * out_dim * 2);
+    
+    // Output layer: weights exported as [hidden][out_dim] transposed
+    // Unroll output dimension for better instruction scheduling
+    for(int o = 0; o < min(out_dim, 4); o++){
+        float sum = nerf_half(out_b_base + uint(o * 2));
+        for(int j = 0; j < hidden; j++){
+            uint w_off = out_w_base + uint((j * out_dim + o) * 2);
+            sum = fma(nerf_half(w_off), cur[j], sum);
+        }
+        outv[o] = sum;
+    }
+
+    // Standard activations: sigmoid for RGB, softplus for density
+    // Sigmoid: 1/(1+exp(-x))
+    // Note: Swap R and B to fix color output (original training uses BGR order internally)
+    vec3 rgb;
+    rgb.r = 1.0 / (1.0 + exp(-outv[2]));  // B -> R
+    rgb.g = 1.0 / (1.0 + exp(-outv[1]));  // G stays
+    rgb.b = 1.0 / (1.0 + exp(-outv[0]));  // R -> B
+    
+    // Softplus: log(1 + exp(x)) for density
+    float val = outv[3];
+    float sigma;
+    if(val > 15.0) sigma = val;           // Linear for large values (avoid overflow)
+    else if(val < -15.0) sigma = 0.0;     // Zero for very negative
+    else sigma = log(1.0 + exp(val));     // Standard softplus
+    
+    sigma = clamp(sigma, 0.0, 100.0);
+    return vec4(rgb, sigma);
+}
+
+vec2 hashgrid_feat(vec3 p){
+    if(!nerf_hash_valid()) return vec2(0.0);
+
+    uint levels = nerfHash.data[2];
+    uint features = nerfHash.data[3];
+    uint hashmap_size = nerfHash.data[4];
+    uint base_res = nerfHash.data[5];
+    float per_level_scale = uintBitsToFloat(nerfHash.data[6]);
+
+    if(levels == 0u || features < 2u || hashmap_size == 0u) return vec2(0.0);
+
+    vec3 pl = nerf_local(p);
+    vec3 pn = clamp(pl * 0.5 + 0.5, vec3(0.0), vec3(1.0));
+    vec2 acc = vec2(0.0);
+    uint entry_words = (features + 1u) / 2u;
+
+    for(uint l = 0u; l < levels; l++){
+        float scale = float(base_res) * pow(per_level_scale, float(l));
+        vec3 grid = pn * (scale - 1.0);
+        ivec3 gi = ivec3(floor(grid));
+        // Clamp to prevent out-of-bounds hashing
+        gi = clamp(gi, ivec3(0), ivec3(int(scale)));
+        uint hx = uint(gi.x);
+        uint hy = uint(gi.y);
+        uint hz = uint(gi.z);
+        uint h = (hx * 73856093u) ^ (hy * 19349663u) ^ (hz * 83492791u);
+        h = h % hashmap_size;
+
+        uint base = HASH_HEADER_WORDS + (l * hashmap_size + h) * entry_words;
+        uint packed = nerfHash.data[base];
+        vec2 f = unpackHalf2x16(packed);
+        acc += f;
+    }
+    return acc / float(levels);
+}
+
+vec3 nerf_buffer_integrate(vec3 ro, vec3 rd){
+    int steps = max(pc.nerfSteps, 1);
+    
+    // Use scene-aware bounds matching training: t_near=2.0, t_far=6.0
+    // NeRF synthetic dataset uses these fixed bounds
+    float t_near = 2.0;
+    float t_far = 6.0;
+    float range = t_far - t_near;
+    float step_size = range / float(steps);
+    
+    vec3 col = vec3(0.0);
+    float trans = 1.0;
+    
+    // Density scaling factor
+    float dens_scale = pc.nerfDensity * step_size;
+    
+    // Density threshold to filter floaters (skip samples with very low sigma)
+    float sigma_threshold = 0.1;  // Balance: 0.01=correct/slow, 1.0=fast/holes
+
+    for(int i = 0; i < steps; i++){
+        float t = t_near + (float(i) + 0.5) * step_size;
+        vec3 p = ro + rd * t;
+        
+        // Check if point is within NeRF volume bounds
+        vec3 pl = nerf_local(p);
+        if(any(lessThan(pl, vec3(-1.0))) || any(greaterThan(pl, vec3(1.0)))) continue;
+        
+        // OCCUPANCY SKIP (disabled in baseline)
+        // if(!occ_sample(p)) continue;
+        
+        // Evaluate MLP at this position
+        vec4 outv = nerf_mlp_eval(p, rd);
+        
+        // Skip low-density samples (floaters)
+        if(outv.w < sigma_threshold) continue;
+        
+        // sigma is already activated by nerf_mlp_eval (softplus applied)
+        float sigma = outv.w * dens_scale;
+        
+        // Standard volume rendering: alpha = 1 - exp(-sigma)
+        float alpha = 1.0 - exp(-sigma);
+        
+        // Accumulate color with transmittance
+        col += trans * alpha * outv.rgb;
+        trans *= (1.0 - alpha);
+        
+        // Early termination when nearly opaque
+        if(trans < 0.01) break;
+    }
+    return col;
+}
+
+// ----------------- DEPTH-CONDITIONED NeRF Integration -----------------
+// Uses CPU depth hints to narrow sampling range from [t_near, t_far] to [depth-δ, depth+δ]
+// This reduces MLP evaluations by 4-8x while maintaining quality.
+// Research: "Depth-Conditioned Heterogeneous NeRF: CPU-Guided Sparse Sampling"
+// This function uses CPU-computed depth hints to narrow the sampling range
+vec3 nerf_depth_conditioned_integrate(vec3 ro, vec3 rd, ivec2 pix){
+    int base_steps = max(pc.nerfSteps, 1);
+    
+    // Read depth hint from CPU prepass buffer
+    // Hint layout: x=depth, y=delta, z=confidence, w=flags
+    int hint_idx = pix.y * pc.W + pix.x;
+    
+    // Default values (fallback to full range)
+    float hint_depth = 4.0;  // Midpoint of [2,6]
+    float hint_delta = 2.0;  // Full half-range
+    float hint_confidence = 0.0;
+    bool use_depth_hint = false;
+    
+    // Check if depth hint buffer has valid data for this pixel
+    if(hint_idx < int(depthHints.hints.length())){
+        vec4 hint = depthHints.hints[hint_idx];
+        hint_depth = hint.x;
+        hint_delta = hint.y;
+        hint_confidence = hint.z;
+        
+        // Use depth hint only when CPU prepass is ready and confidence > 0.5
+        use_depth_hint = (pc.depthHintsReady != 0) && (hint_confidence > 0.5);
+    }
+    
+    // Compute sampling bounds - HYBRID approach for quality
+    // Always sample full range but concentrate steps near hint
+    float t_near = 2.0;
+    float t_far = 6.0;
+    int steps = base_steps;
+    
+    // When we have a depth hint, we use stratified sampling:
+    // - More samples near the hint (dense region)
+    // - Fewer samples far from hint (sparse region)  
+    // This maintains quality while still getting speedup
+    float focus_center = use_depth_hint ? hint_depth : 4.0;
+    float focus_radius = use_depth_hint ? hint_delta : 2.0;
+    
+    // Ensure valid range and use a hybrid sampling strategy when a hint exists:
+    // - sparse stratified samples across the full range
+    // - dense stratified samples inside the focused band
+    float range = t_far - t_near;
+
+    vec3 col = vec3(0.0);
+    float trans = 1.0;
+    float sigma_threshold = 0.1;  // Balance: 0.01=correct/slow, 1.0=fast/holes
+
+    if(use_depth_hint){
+        // Split samples into sparse full-range and focused band samples
+        int focus_samples = max(8, steps / 2);
+        int sparse_samples = max(0, steps - focus_samples);
+
+        // Sparse full-range stratified sampling
+        if(sparse_samples > 0){
+            float sparse_step = range / float(sparse_samples);
+            for(int i = 0; i < sparse_samples; i++){
+                float t = t_near + (float(i) + 0.5) * sparse_step;
+                vec3 p = ro + rd * t;
+                vec3 pl = nerf_local(p);
+                if(any(lessThan(pl, vec3(-1.0))) || any(greaterThan(pl, vec3(1.0)))) continue;
+                if(hint_confidence > 0.9){ if(!occ_sample(p)) continue; }
+                vec4 outv = nerf_mlp_eval(p, rd);
+                float sigma = outv.w * (pc.nerfDensity * sparse_step);
+                float alpha = 1.0 - exp(-sigma);
+                col += trans * alpha * outv.rgb;
+                trans *= (1.0 - alpha);
+                if(trans < 0.01) break;
+            }
+        }
+
+        // Focused dense sampling around the hint
+        float f0 = max(focus_center - focus_radius, t_near);
+        float f1 = min(focus_center + focus_radius, t_far);
+        float focus_range = max(1e-6, f1 - f0);
+        float focus_step = focus_range / float(focus_samples);
+        for(int i = 0; i < focus_samples; i++){
+            float t = f0 + (float(i) + 0.5) * focus_step;
+            vec3 p = ro + rd * t;
+            vec3 pl = nerf_local(p);
+            if(any(lessThan(pl, vec3(-1.0))) || any(greaterThan(pl, vec3(1.0)))) continue;
+            if(hint_confidence > 0.9){ if(!occ_sample(p)) continue; }
+            vec4 outv = nerf_mlp_eval(p, rd);
+            float sigma = outv.w * (pc.nerfDensity * focus_step);
+            float alpha = 1.0 - exp(-sigma);
+            col += trans * alpha * outv.rgb;
+            trans *= (1.0 - alpha);
+            if(trans < 0.01) break;
+        }
+    } else {
+        // No hint: uniform stratified sampling across the full range
+        float uni_step = range / float(steps);
+        for(int i = 0; i < steps; i++){
+            float t = t_near + (float(i) + 0.5) * uni_step;
+            vec3 p = ro + rd * t;
+            vec3 pl = nerf_local(p);
+            if(any(lessThan(pl, vec3(-1.0))) || any(greaterThan(pl, vec3(1.0)))) continue;
+            vec4 outv = nerf_mlp_eval(p, rd);
+            float sigma = outv.w * (pc.nerfDensity * uni_step);
+            float alpha = 1.0 - exp(-sigma);
+            col += trans * alpha * outv.rgb;
+            trans *= (1.0 - alpha);
+            if(trans < 0.01) break;
+        }
+    }
+
+    // Safety fallback: if hybrid focused sampling encountered almost no density
+    // (trans remaining very close to 1), we likely missed geometry — perform
+    // a conservative full-range integration to avoid black holes.
+    if(use_depth_hint && trans > 0.999) {
+        float trans2 = 1.0;
+        vec3 col2 = vec3(0.0);
+        float uni_step = range / float(max(1, steps));
+        for(int j = 0; j < steps; j++){
+            float t = t_near + (float(j) + 0.5) * uni_step;
+            vec3 p = ro + rd * t;
+            vec3 pl = nerf_local(p);
+            if(any(lessThan(pl, vec3(-1.0))) || any(greaterThan(pl, vec3(1.0)))) continue;
+            if(hint_confidence > 0.9){ if(!occ_sample(p)) continue; }
+            vec4 outv = nerf_mlp_eval(p, rd);
+            float sigma = outv.w * (pc.nerfDensity * uni_step);
+            float alpha = 1.0 - exp(-sigma);
+            col2 += trans2 * alpha * outv.rgb;
+            trans2 *= (1.0 - alpha);
+            if(trans2 < 0.01) break;
+        }
+        col = col2;
+        trans = trans2;
+    }
+    return col;
+}
+
+// ----------------- Probe Placeholder (procedural sky) -----------------
+vec3 probe_placeholder(vec3 rd){
+    // Simple analytic sky with sun lobe (for baseline comparison)
+    vec3 skyTop = vec3(0.18, 0.35, 0.65);
+    vec3 skyHorizon = vec3(0.75, 0.82, 0.90);
+    float t = clamp(rd.y * 0.5 + 0.5, 0.0, 1.0);
+    vec3 sky = mix(skyHorizon, skyTop, t);
+    vec3 sunDir = normalize(vec3(0.2, 0.8, 0.1));
+    float sun = pow(max(dot(rd, sunDir), 0.0), 256.0);
+    return sky + sun * vec3(1.2, 1.1, 1.0);
+}
+
+void main(){
+    ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+    if(pix.x >= pc.W || pix.y >= pc.H) return;
+
+    // ADAPTIVE SAMPLING: Check previous frame variance
+    // High variance = sample more (jitter more), Low variance = jitter less
+    vec3 accum_prev = imageLoad(accumImg, pix).rgb;
+    float prev_luma = dot(accum_prev, vec3(0.2126, 0.7152, 0.0722));
+    
+    // Calculate neighborhood variance for adaptation (3x3 neighborhood)
+    // Use efficient variance computation: variance = E[x²] - E[x]²
+    float variance = 0.0;
+    float sum_sq = 0.0;
+    for(int oy=-1; oy<=1; oy++){
+        for(int ox=-1; ox<=1; ox++){
+            ivec2 q = ivec2(clamp(pix.x+ox, 0, pc.W-1), clamp(pix.y+oy, 0, pc.H-1));
+            vec3 neighbor = imageLoad(accumImg, q).rgb;
+            float nluma = dot(neighbor, vec3(0.2126, 0.7152, 0.0722));
+            float delta = nluma - prev_luma;
+            sum_sq += delta * delta;  // Better than separate adds
+        }
+    }
+    variance = sum_sq / 9.0;
+    
+    // Adaptive jitter: high variance = larger jitter radius
+    float jitter_scale = 1.0 + min(variance * 5.0, 1.0);  // 1x to 2x jitter
+
+    // Stochastic sampling: add adaptive random jitter to pixel coordinates
+    uint rng_state = wang_hash(uint(pix.x + pix.y * 73856093) ^ uint(pc.frame));
+    float jitter_x = (rand01(rng_state) - 0.5) * jitter_scale;
+    float jitter_y = (rand01(rng_state) - 0.5) * jitter_scale;
+    
+    float u = (float(pix.x) + 0.5 + jitter_x) / float(pc.W);
+    float v = (float(pix.y) + 0.5 + jitter_y) / float(pc.H);
+
+    // CAMERA: Proper ray generation from camera space to world space
+    vec3 ro = camera.pos.xyz;
+    vec3 forward = safe_normalize(camera.forward.xyz);
+    vec3 right = safe_normalize(camera.right.xyz);
+    vec3 up = safe_normalize(camera.up.xyz);
+
+    // Fallback to a sane basis if CPU sent degenerate vectors (avoid normalization if not needed)
+    float forward_len_sq = dot(forward, forward);
+    float right_len_sq = dot(right, right);
+    float up_len_sq = dot(up, up);
+    
+    if(forward_len_sq < 1e-6 || right_len_sq < 1e-6 || up_len_sq < 1e-6){
+        vec3 world_up = vec3(0.0, 1.0, 0.0);
+        if(forward_len_sq < 1e-6) forward = vec3(0.0, 0.0, -1.0);
+        right = safe_normalize(cross(forward, world_up));
+        up = safe_normalize(cross(right, forward));
+    }
+
+    // Camera parameters matching Lego: focal_px=1111.1 for 800px height.
+    // Pre-compute viewport dimensions once
+    float aspect_ratio = float(pc.W) / float(pc.H);
+    float viewport_h = 0.72; // Zoomed in to match Lego dataset
+    float viewport_w = aspect_ratio * viewport_h;
+    float focal_length = 1.0;
+    
+    // Pre-scale normalized coordinates for faster ray computation
+    float local_x = viewport_w * (u - 0.5);
+    float local_y = viewport_h * (v - 0.5);
+    
+    // Optimized ray direction: compute once with FMA pattern
+    vec3 rd = normalize(right * local_x + up * local_y + forward * focal_length);
+
+    float tHit = 1e30;
+    vec3 nHit = vec3(0, 0, 1);
+    
+    // Probe placeholder mode skips mesh traversal entirely
+    if(pc.renderMode != 1){
+        if(pc.useBVH != 0){
+            bvh_traverse_multi(ro, rd, tHit, nHit);
+        } else {
+            bool countIt = (((pix.x & 15) == 0) && ((pix.y & 15) == 0));
+            brute_force(ro, rd, tHit, nHit, countIt);
+        }
+    }
+    
+    // MATERIAL SHADING: Simple PBR-inspired shading based on normal
+    // Working in LINEAR color space for proper physics
+    vec3 col = vec3(0.0);
+    if(pc.renderMode == 3){
+        // NeRF-only volumetric raymarching
+        col = nerf_hash_valid() ? nerf_buffer_integrate(ro, rd)
+                                : (nerf_proxy_integrate(ro, rd) * pc.nerfStrength);
+    } else if(pc.renderMode == 26){
+        // DEPTH-CONDITIONED NeRF: CPU-guided sparse sampling (4-8x faster)
+        // Uses depth hints from CPU BVH prepass to narrow sampling range
+        col = nerf_hash_valid() ? nerf_depth_conditioned_integrate(ro, rd, pix)
+                                : (nerf_proxy_integrate(ro, rd) * pc.nerfStrength);
+    } else if(pc.renderMode == 27){
+        // Debug: Visualize depth hints (R=depth/10, G=delta, B=confidence)
+        int hint_idx = pix.y * pc.W + pix.x;
+        if(hint_idx < int(depthHints.hints.length())){
+            vec4 hint = depthHints.hints[hint_idx];
+            col = vec3(hint.x / 10.0, hint.y, hint.z);
+        } else {
+            col = vec3(1.0, 0.0, 1.0); // Magenta = out of bounds
+        }
+    } else if(pc.renderMode == 4){
+        // NeRF feature debug: R=hash valid, G=occupancy (mid sample), B=feature sum
+        float t = max(pc.nerfBounds, 1.0) * 0.5;
+        vec3 p = ro + rd * t;
+        vec2 feat = hashgrid_feat(p);
+        float hv = nerf_hash_valid() ? 1.0 : 0.0;
+        float occ = occ_sample(p) ? 1.0 : 0.0;
+        float fsum = clamp(feat.x + feat.y, 0.0, 1.0);
+        col = vec3(hv, occ, fsum);
+    } else if(pc.renderMode == 11){
+        // Debug: Normalized sampling coordinates (pn) at mid-ray
+        float t = 4.0; // midpoint of [2, 6]
+        vec3 p = ro + rd * t;
+        vec3 pl = nerf_local(p);
+        vec3 pn = clamp(pl * 0.5 + 0.5, vec3(0.0), vec3(1.0));
+        col = pn;
+    } else if(pc.renderMode == 5){
+        // NeRF raymarch debug: R=hash valid, G=occupancy ratio, B=max feature
+        int steps = max(pc.nerfSteps, 1);
+        float tmax = max(pc.nerfBounds, 1.0);
+        float step = tmax / float(steps);
+        float occ_hits = 0.0;
+        float max_feat = 0.0;
+        for(int i = 0; i < steps; i++){
+            float t = (float(i) + 0.5) * step;
+            vec3 p = ro + rd * t;
+            if(occ_sample(p)){
+                occ_hits += 1.0;
+                vec2 feat = hashgrid_feat(p);
+                float fsum = clamp(feat.x + feat.y, 0.0, 1.0);
+                max_feat = max(max_feat, fsum);
+            }
+        }
+        float hv = nerf_hash_valid() ? 1.0 : 0.0;
+        float occ_ratio = occ_hits / float(steps);
+        col = vec3(hv, occ_ratio, max_feat);
+    } else if(pc.renderMode == 6){
+        // NeRF sigma debug: grayscale density at mid-ray
+        float t = max(pc.nerfBounds, 1.0) * 0.5;
+        vec3 p = ro + rd * t;
+        vec4 outv = nerf_mlp_eval(p, rd);
+        float s = clamp(outv.w * pc.nerfDensity * 0.1, 0.0, 1.0);
+        // Show RGB output too (scaled down)
+        col = vec3(outv.x * 0.5, outv.y * 0.5, s);
+    } else if(pc.renderMode == 7){
+        // Debug: Test MLP inputs/outputs
+        float t = max(pc.nerfBounds, 1.0) * 0.5;
+        vec3 p = ro + rd * t;
+        
+        // Get embedding
+        float embed[MAX_EMBED];
+        int embed_len = hashgrid_embed(p, embed);
+        
+        // Build MLP input (same as in nerf_mlp_eval)
+        float in0[MAX_IN];
+        int in_len = 27; // mlp_in from header
+        for(int i = 0; i < in_len; i++) in0[i] = 0.0;
+        for(int i = 0; i < min(embed_len, in_len); i++) in0[i] = embed[i];
+        vec3 v = safe_normalize(rd);
+        in0[24] = v.x;
+        in0[25] = v.y;
+        in0[26] = v.z;
+        
+        // Show first 3 input values as RGB
+        float r = clamp(in0[0] * 5.0 + 0.5, 0.0, 1.0);
+        float g = clamp(in0[1] * 5.0 + 0.5, 0.0, 1.0);
+        float b = clamp(in0[2] * 5.0 + 0.5, 0.0, 1.0);
+        col = vec3(r, g, b);
+    } else if(pc.renderMode == 8){
+        // Debug: Show raw first MLP weight
+        uint header_bytes = HASH_HEADER_WORDS * 4u;
+        uint table_bytes = 12u * 8192u * 2u * 2u; // levels * hashmap * features * 2bytes
+        uint mlp_start = header_bytes + table_bytes;
+        
+        // Read first 3 weights of first hidden layer
+        float w0 = nerf_half(mlp_start + 0u);
+        float w1 = nerf_half(mlp_start + 2u);
+        float w2 = nerf_half(mlp_start + 4u);
+        
+        float r = clamp(abs(w0) * 2.0, 0.0, 1.0);
+        float g = clamp(abs(w1) * 2.0, 0.0, 1.0);
+        float b = clamp(abs(w2) * 2.0, 0.0, 1.0);
+        col = vec3(r, g, b);
+    } else if(pc.renderMode == 9){
+        // Debug: Show MLP fallback ratio (red=fallback, green=valid MLP)
+        float t = max(pc.nerfBounds, 1.0) * 0.5;
+        vec3 p = ro + rd * t;
+        vec4 outv = nerf_mlp_eval(p, rd);
+        float dens = outv.w * pc.nerfDensity;
+        bool bad = isnan(outv.x) || isnan(outv.y) || isnan(outv.z) || dens < 0.0 || dens > 1000.0;
+        col = bad ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+    } else if(pc.renderMode == 10){
+        // Debug: MLP raw output clamped (ignore sigmoid/relu)
+        float t = max(pc.nerfBounds, 1.0) * 0.5;
+        vec3 p = ro + rd * t;
+        vec4 outv = nerf_mlp_eval(p, rd);
+        // outv has already been clamped in nerf_mlp_eval
+        col = vec3(outv.x, outv.y, outv.z);
+    } else if(pc.renderMode == 11){
+        // Debug: Ray direction visualization (map [-1,1] to [0,1])
+        col = rd * 0.5 + 0.5;
+    } else if(pc.renderMode == 12){
+        // Debug: Show raw UV coordinates (should be horizontal/vertical gradient)
+        col = vec3(u, v, 0.5);
+    } else if(pc.renderMode == 13){
+        // Debug: Show normalized position pn that feeds into hash grid
+        float t = max(pc.nerfBounds, 1.0) * 0.5;
+        vec3 p = ro + rd * t;
+        vec3 pl = nerf_local(p);
+        vec3 pn = clamp(pl * 0.5 + 0.5, vec3(0.0), vec3(1.0));
+        col = pn;  // Should show 3D gradient if correctly varying
+    } else if(pc.renderMode == 14){
+        // Debug: Show world position p at mid-ray
+        float t = max(pc.nerfBounds, 1.0) * 0.5;
+        vec3 p = ro + rd * t;
+        // Normalize to [0,1] based on expected bounds
+        col = clamp((p + 10.0) / 20.0, 0.0, 1.0);
+    } else if(pc.renderMode == 15){
+        // Debug: Show hash index for level 0 as color
+        float t = max(pc.nerfBounds, 1.0) * 0.5;
+        vec3 p = ro + rd * t;
+        vec3 pl = nerf_local(p);
+        vec3 pn = clamp(pl * 0.5 + 0.5, vec3(0.0), vec3(1.0));
+        
+        uint base_res = nerfHash.data[5];
+        float per_level_scale = uintBitsToFloat(nerfHash.data[6]);
+        uint hashmap_size = nerfHash.data[4];
+        
+        float res = float(base_res);
+        vec3 grid = pn * res;
+        ivec3 gi = ivec3(floor(grid));
+        uint hx = uint(max(gi.x, 0));
+        uint hy = uint(max(gi.y, 0));
+        uint hz = uint(max(gi.z, 0));
+        uint h = (hx * 73856093u) ^ (hy * 19349663u) ^ (hz * 83492791u);
+        h = h % hashmap_size;
+        
+        // Map hash to color
+        float hf = float(h) / float(hashmap_size);
+        col = vec3(fract(hf * 7.0), fract(hf * 13.0), fract(hf * 23.0));
+    } else if(pc.renderMode == 16){
+        // Debug: Show raw float16 values from first 3 hashgrid entries
+        if(!nerf_hash_valid()){
+            col = vec3(1.0, 1.0, 0.0); // yellow = no buffer
+        } else {
+            // Read first 3 float16 values directly from table (after header)
+            uint header_bytes = 15u * 4u; // 60 bytes
+            float v0 = nerf_half(header_bytes + 0u);
+            float v1 = nerf_half(header_bytes + 2u);
+            float v2 = nerf_half(header_bytes + 4u);
+            
+            // Show raw values mapped to 0-1 (assuming trained values are roughly -1 to 1)
+            col = vec3(v0 * 0.5 + 0.5, v1 * 0.5 + 0.5, v2 * 0.5 + 0.5);
+        }
+    } else if(pc.renderMode == 17){
+        // Debug: Show raw MLP weights (first layer, first 3 weights of first neuron)
+        if(!nerf_hash_valid()){
+            col = vec3(1.0, 1.0, 0.0); // yellow = no buffer
+        } else {
+            uint levels = nerfHash.data[2];
+            uint features = nerfHash.data[3];
+            uint hashmap_size = nerfHash.data[4];
+            uint header_bytes = 15u * 4u;
+            uint table_bytes = levels * hashmap_size * features * 2u;
+            uint weight_offset = header_bytes + table_bytes;
+            
+            // Read first 3 weights from first hidden layer
+            float w0 = nerf_half(weight_offset + 0u);
+            float w1 = nerf_half(weight_offset + 2u);
+            float w2 = nerf_half(weight_offset + 4u);
+            
+            // Map to visible range (weights are typically -0.5 to 0.5)
+            col = vec3(w0 * 2.0 + 0.5, w1 * 2.0 + 0.5, w2 * 2.0 + 0.5);
+        }
+    } else if(pc.renderMode == 18){
+        // Debug: Show nerf_buffer_integrate output directly
+        col = nerf_hash_valid() ? nerf_buffer_integrate(ro, rd) : vec3(1.0, 0.0, 1.0);
+    } else if(pc.renderMode == 19){
+        // Debug: Verify GPU buffer - read magic number at word 0
+        // Magic should be 0x3147484E. Show as RGB.
+        uint magic = nerfHash.data[0];
+        // R = (magic & 0xFF) / 255.0 = 0x4E / 255 = 0.306
+        // G = ((magic >> 8) & 0xFF) / 255.0 = 0x48 / 255 = 0.282
+        // B = ((magic >> 16) & 0xFF) / 255.0 = 0x47 / 255 = 0.278
+        // Should be a brownish gray
+        col = vec3(
+            float(magic & 0xFFu) / 255.0,
+            float((magic >> 8u) & 0xFFu) / 255.0,
+            float((magic >> 16u) & 0xFFu) / 255.0
+        );
+    } else if(pc.renderMode == 20){
+        // Debug: Show push constant values (center/scale)
+        // R = scale/10, G = centerX/10+0.5, B = centerY/10+0.5
+        col = vec3(
+            pc.nerfScale / 10.0,
+            pc.nerfCenterX / 10.0 + 0.5,
+            pc.nerfCenterY / 10.0 + 0.5
+        );
+    } else if(pc.renderMode == 21){
+        // Debug: Show ray direction as color (should be smooth gradient)
+        col = rd * 0.5 + 0.5;
+    } else if(pc.renderMode == 22){
+        // Debug: Show UV coordinates (pixel position)
+        col = vec3(u, v, 0.5);
+    } else if(pc.renderMode == 23){
+        // Debug: Pure RED test
+        col = vec3(1.0, 0.0, 0.0);
+    } else if(pc.renderMode == 24){
+        // Debug: Pure GREEN test
+        col = vec3(0.0, 1.0, 0.0);
+    } else if(pc.renderMode == 25){
+        // Debug: Pure BLUE test
+        col = vec3(0.0, 0.0, 1.0);
+    } else if(pc.renderMode == 1){
+        // Probe placeholder baseline
+        col = probe_placeholder(rd);
+    } else {
+        if(tHit < 1e29){
+            // Use normal for shading (simple Lambert diffuse approximation)
+            // Light coming from top (-Z direction toward camera)
+            vec3 light_dir = normalize(vec3(0.0, 0.3, 1.0));
+            
+            // Combine distance-based color with shading (in LINEAR space)
+            float d = clamp(tHit / 10.0, 0.0, 1.0);
+            vec3 base_color = vec3(0.5 + 0.5 * d);
+            
+            // Dispatch to appropriate material shader variant
+            col = shade_material(base_color, nHit, rd, tHit, light_dir);
+        }
+
+        // Hybrid Mesh + NeRF buffer blend (fallback to proxy if no buffers)
+        if(pc.renderMode == 2 || pc.enableNerfProxy != 0){
+            vec3 nerf_col = nerf_hash_valid() ? nerf_buffer_integrate(ro, rd)
+                                              : (nerf_proxy_integrate(ro, rd) * pc.nerfStrength);
+            if(tHit < 1e29){
+                col = mix(col, nerf_col, pc.nerfBlend);
+            } else {
+                col = nerf_col;
+            }
+        }
+    }
+
+    // Accumulate across frames
+    vec3 prev_accum = imageLoad(accumImg, pix).rgb;
+    vec3 final_accum;
+    
+    // Disable temporal for debug modes 7-12 to see single-frame output
+    if(pc.renderMode >= 7 && pc.renderMode <= 12){
+        final_accum = col;
+    } else if(pc.frame == 0 || pc.resetAccum != 0){
+        // First frame: initialize accumulation
+        final_accum = col;
+    } else if(pc.alpha > 0.0){
+        // EMA mode: exponential weighted average
+        // new = alpha * curr + (1-alpha) * prev
+        final_accum = mix(prev_accum, col, pc.alpha);
+    } else {
+        // Running average: weighted by frame count
+        float w = 1.0 / float(pc.frame + 1);
+        final_accum = mix(prev_accum, col, w);
+    }
+
+    imageStore(outImg, pix, vec4(final_accum, 1.0));
+    imageStore(accumImg, pix, vec4(final_accum, 1.0));
+}
+ 

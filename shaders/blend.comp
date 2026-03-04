@@ -1,0 +1,47 @@
+// Temporal denoiser: blend current frame with previous denoised frame
+// For Option 2: Temporal Denoising
+// Reduces temporal flicker and noise by accumulating denoised history
+
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// Current frame: just denoised
+layout(set=0, binding=0, rgba32f) uniform image2D current_frame;
+
+// Previous frame: denoised output from frame N-1
+layout(set=0, binding=1, rgba32f) uniform image2D history_frame;
+
+// Output: temporally blended result
+layout(set=0, binding=2, rgba32f) uniform image2D output_frame;
+
+layout(push_constant) uniform PushConstants {
+    int W;              // Image width
+    int H;              // Image height
+    float weight;       // 0.7 = 70% history, 30% current (history bias for temporal smoothing)
+    int frame_id;       // Frame counter (for first-frame detection)
+} pc;
+
+void main() {
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    
+    // Bounds check
+    if(pos.x >= pc.W || pos.y >= pc.H) return;
+    
+    vec4 curr = imageLoad(current_frame, pos);
+    vec4 hist = imageLoad(history_frame, pos);
+    
+    // First frame: use current only (no history)
+    // Subsequent frames: temporal blend (history-biased for smoothness)
+    vec4 result;
+    if(pc.frame_id == 0) {
+        result = curr;
+    } else {
+        // Temporal exponential moving average
+        // weight=0.7: new_val = 0.7*old_val + 0.3*new_sample
+        // This gives high temporal coherence while allowing gradual adaptation
+        result = mix(curr, hist, pc.weight);
+    }
+    
+    imageStore(output_frame, pos, result);
+}

@@ -1,0 +1,97 @@
+#version 450
+layout(local_size_x=16, local_size_y=16, local_size_z=1) in;
+
+layout(push_constant) uniform Push {
+    int W;
+    int H;
+    float exposure;
+    float gamma;
+    int dummy;
+} pc;
+
+layout(set=0, binding=0, rgba32f) readonly uniform image2D hdrImg;
+
+#if defined(YSU_BGRA)
+layout(set=0, binding=1, bgra8) writeonly uniform image2D outLDR;
+#else
+layout(set=0, binding=1, rgba8) writeonly uniform image2D outLDR;
+#endif
+
+vec3 tonemap_filmic(vec3 x){
+    // Improved Filmic tone map
+    x = max(x, vec3(0.0));
+    x = (x*(2.51*x + 0.03)) / (x*(2.43*x + 0.59) + 0.14);
+    return clamp(x, 0.0, 1.0);
+}
+
+// ACES tone mapping (Academy Color Encoding System) - Industry standard
+vec3 tonemap_aces(vec3 x){
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+// Reinhard tone mapping with luminance preservation
+vec3 tonemap_reinhard(vec3 x){
+    float lum = dot(x, vec3(0.2126, 0.7152, 0.0722));
+    float tm_lum = lum / (1.0 + lum);
+    return x * (tm_lum / (lum + 1e-6));
+}
+
+// ANTI-ALIASING: Blackman-Harris 2D filter kernel
+// Reduces aliasing artifacts via spatial filtering
+float blackman_harris_1d(float x) {
+    // 1D Blackman-Harris window (applied separably)
+    float a0 = 0.35875;
+    float a1 = 0.48829;
+    float a2 = 0.14128;
+    float a3 = 0.01168;
+    x = clamp(x * 2.0, -1.0, 1.0);  // Normalize to [-1, 1]
+    return a0 - a1 * cos(3.14159 * (x + 1.0)) + a2 * cos(2.0 * 3.14159 * (x + 1.0)) - a3 * cos(3.0 * 3.14159 * (x + 1.0));
+}
+
+// Apply separable Blackman-Harris filter to neighborhood
+vec3 apply_aa_filter(ivec2 center, int radius) {
+    vec3 result = vec3(0.0);
+    float weight_sum = 0.0;
+    
+    for(int dy = -radius; dy <= radius; dy++) {
+        for(int dx = -radius; dx <= radius; dx++) {
+            ivec2 pos = center + ivec2(dx, dy);
+            if(pos.x >= 0 && pos.x < pc.W && pos.y >= 0 && pos.y < pc.H) {
+                // Separable application: bh(x) * bh(y)
+                float wx = blackman_harris_1d(float(dx) / float(radius + 1));
+                float wy = blackman_harris_1d(float(dy) / float(radius + 1));
+                float weight = wx * wy;
+                
+                vec4 samp = imageLoad(hdrImg, pos);
+                result += samp.rgb * weight;
+                weight_sum += weight;
+            }
+        }
+    }
+    
+    return (weight_sum > 0.0) ? result / weight_sum : imageLoad(hdrImg, center).rgb;
+}
+
+void main(){
+    uvec2 gid = gl_GlobalInvocationID.xy;
+    if(int(gid.x) >= pc.W || int(gid.y) >= pc.H) return;
+
+    // For debug, skip AA filter to see raw output
+    vec3 c = imageLoad(hdrImg, ivec2(gid)).rgb;
+    c = c * pc.exposure;
+
+    // Use ACES tone mapping (industry standard - higher quality)
+    c = tonemap_aces(c);
+
+    float invg = 1.0 / max(pc.gamma, 1e-6);
+    c = pow(c, vec3(invg));
+
+    // Force swap BGR for Windows swapchain (BGRA)
+    // imageStore(outLDR, ivec2(gid), vec4(c, 1.0));
+    imageStore(outLDR, ivec2(gid), vec4(c.b, c.g, c.r, 1.0));
+}

@@ -1,0 +1,264 @@
+// quantum_wavefunction.comp — GPU evaluation of hydrogen-like electron
+// probability density |ψ_{nlm}(r,θ,φ)|² on a uniform 3D grid.
+//
+// Physics:
+//   ψ_{nlm}(r,θ,φ) = R_{nl}(r) · Y_l^m(θ,φ)
+//   where R_{nl} is the radial wavefunction (associated Laguerre polynomials)
+//   and Y_l^m are spherical harmonics.
+//
+//   For multi-electron atoms we use a Slater-type effective nuclear charge Z_eff
+//   and sum over occupied orbitals: ρ(r) = Σ_i |ψ_i(r)|²
+//
+//   All distances in units of a₀ (Bohr radius = 0.529 Å).
+//   Energies implicitly in Hartree (27.2 eV).
+//
+// Output: 3D SSBO grid of float density values, ready for volume raymarching.
+
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+// Output density grid |ψ|² (float per voxel)
+layout(std430, set=0, binding=0) buffer DensityGrid {
+    float density[];
+} grid;
+
+// Output signed wavefunction grid Re(ψ) — for phase/nodal-surface visualization
+layout(std430, set=0, binding=2) buffer SignedOutGrid {
+    float signedPsi[];
+} signedOut;
+
+// Orbital configuration buffer — up to 30 orbitals (covers up to Zn)
+struct OrbitalConfig {
+    int n;           // principal quantum number (1,2,3,...)
+    int l;           // angular momentum (0..n-1)
+    int m;           // magnetic quantum number (-l..+l)
+    float Z_eff;     // effective nuclear charge (Slater's rules)
+    float occupation; // electron count in this orbital (0-2)
+    float phase_t;   // time phase for animation (ω·t)
+    float pad0;
+    float pad1;
+};
+
+layout(std430, set=0, binding=1) readonly buffer OrbitalBuf {
+    OrbitalConfig orbitals[];
+} orb;
+
+layout(push_constant) uniform QuantumPush {
+    int gridDim;        // grid resolution per axis (e.g. 128)
+    int numOrbitals;    // number of active orbitals
+    float boxHalf;      // half-extent of sampling box in a₀ (e.g. 20.0)
+    float isoValue;     // optional iso threshold for binary output
+    int outputMode;     // 0 = density |ψ|², 1 = signed Re(ψ), 2 = phase-colored
+    float time;         // animation time for superposition states
+    float densityScale; // global density multiplier
+    int enableSpin;     // if 1, double occupation contributes 2x density
+} qpc;
+
+// ======================== MATHEMATICAL UTILITIES ========================
+
+// Factorial via lookup (n ≤ 20 in practice)
+float factorial(int n) {
+    float f = 1.0;
+    for (int i = 2; i <= n; i++) f *= float(i);
+    return f;
+}
+
+// Associated Laguerre polynomial L_p^k(x) via recurrence
+// L_0^k(x) = 1
+// L_1^k(x) = 1 + k - x
+// (p+1)·L_{p+1}^k = (2p+1+k-x)·L_p^k - (p+k)·L_{p-1}^k
+float assoc_laguerre(int p, int k, float x) {
+    if (p == 0) return 1.0;
+    float L0 = 1.0;
+    float L1 = 1.0 + float(k) - x;
+    if (p == 1) return L1;
+    for (int i = 1; i < p; i++) {
+        float L2 = ((2.0 * float(i) + 1.0 + float(k) - x) * L1
+                   - (float(i) + float(k)) * L0) / float(i + 1);
+        L0 = L1;
+        L1 = L2;
+    }
+    return L1;
+}
+
+// Associated Legendre polynomial P_l^m(x) for m ≥ 0
+// Uses recurrence: (l-m)·P_l^m = x·(2l-1)·P_{l-1}^m - (l+m-1)·P_{l-2}^m
+// Starting from P_m^m = (-1)^m · (2m-1)!! · (1-x²)^{m/2}
+float assoc_legendre(int l, int m_abs, float x) {
+    // P_m^m
+    float pmm = 1.0;
+    if (m_abs > 0) {
+        float somx2 = sqrt(max(1.0 - x * x, 0.0));
+        float fact = 1.0;
+        for (int i = 1; i <= m_abs; i++) {
+            pmm *= -fact * somx2;
+            fact += 2.0;
+        }
+    }
+    if (l == m_abs) return pmm;
+
+    // P_{m+1}^m
+    float pmmp1 = x * (2.0 * float(m_abs) + 1.0) * pmm;
+    if (l == m_abs + 1) return pmmp1;
+
+    // Upward recurrence
+    float pll = 0.0;
+    for (int ll = m_abs + 2; ll <= l; ll++) {
+        pll = (x * (2.0 * float(ll) - 1.0) * pmmp1
+              - (float(ll + m_abs) - 1.0) * pmm) / float(ll - m_abs);
+        pmm = pmmp1;
+        pmmp1 = pll;
+    }
+    return pll;
+}
+
+// ======================== RADIAL WAVEFUNCTION ========================
+// R_{nl}(r) = N_{nl} · ρ^l · exp(-ρ/2) · L_{n-l-1}^{2l+1}(ρ)
+//
+// where ρ = 2Zr/(n·a₀) and the normalization is:
+//   N_{nl} = sqrt( (2Z/n)³ · (n-l-1)! / (2n · (n+l)!) )
+//
+// CONVENTION NOTE: This normalization pairs with the standard generalized
+// Laguerre polynomial L_n^{(α)} satisfying L_0^{(α)}=1, L_1^{(α)}=1+α-x.
+// Griffiths' formula uses [(n+l)!]³ because his L_p^q = (p+q)! · L_p^{(q)}.
+// Our recurrence computes the standard L_p^{(q)}, so we use (n+l)!¹.
+
+float radial_wavefunction(int n, int l, float Z, float r) {
+    float rho = 2.0 * Z * r / float(n);
+
+    // Normalization: N = sqrt( (2Z/n)^3 · (n-l-1)! / (2n · (n+l)!) )
+    float fact_nml1 = factorial(n - l - 1);
+    float fact_npl  = factorial(n + l);
+    float norm = sqrt(pow(2.0 * Z / float(n), 3.0) * fact_nml1
+                     / (2.0 * float(n) * fact_npl));
+
+    // ρ^l term
+    float rho_l = pow(rho, float(l));
+
+    // Exponential decay
+    float exponential = exp(-rho * 0.5);
+
+    // Associated Laguerre polynomial L_{n-l-1}^{2l+1}(ρ)
+    int p = n - l - 1;     // degree
+    int k = 2 * l + 1;     // order
+    float laguerre = assoc_laguerre(p, k, rho);
+
+    return norm * rho_l * exponential * laguerre;
+}
+
+// ======================== SPHERICAL HARMONICS ========================
+// Y_l^m(θ,φ) = K_l^m · P_l^|m|(cos θ) · e^{imφ}
+//
+// Normalization: K_l^m = sqrt[(2l+1)/(4π) · (l-|m|)!/(l+|m|)!]
+// For real spherical harmonics (what we visualize):
+//   m > 0: Y_l^m ∝ P_l^m(cos θ) · cos(mφ)
+//   m = 0: Y_l^0 ∝ P_l^0(cos θ)
+//   m < 0: Y_l^|m| ∝ P_l^|m|(cos θ) · sin(|m|φ)
+
+// Returns vec2(Re, Im) of the complex spherical harmonic,
+// or for outputMode != 2, the real spherical harmonic in .x
+vec2 spherical_harmonic(int l, int m, float cos_theta, float phi) {
+    int m_abs = abs(m);
+
+    // Normalization constant
+    float K = sqrt((2.0 * float(l) + 1.0) / (4.0 * 3.14159265358979323846)
+              * factorial(l - m_abs) / factorial(l + m_abs));
+
+    float P = assoc_legendre(l, m_abs, cos_theta);
+
+    // Real spherical harmonics convention (standard for visualization)
+    if (m > 0) {
+        // √2 · K · P_l^m · cos(mφ)
+        float val = 1.41421356 * K * P * cos(float(m) * phi);
+        return vec2(val, 0.0);
+    } else if (m < 0) {
+        // √2 · K · P_l^|m| · sin(|m|φ)
+        float val = 1.41421356 * K * P * sin(float(m_abs) * phi);
+        return vec2(val, 0.0);
+    } else {
+        // m = 0
+        return vec2(K * P, 0.0);
+    }
+}
+
+// ======================== FULL WAVEFUNCTION ========================
+// ψ_{nlm}(r,θ,φ) = R_{nl}(r) · Y_l^m(θ,φ)
+// Returns vec2(Re(ψ), Im(ψ)) for complex wavefunctions or (real_ψ, 0) for real
+
+vec2 hydrogen_wavefunction(int n, int l, int m, float Z_eff, vec3 pos) {
+    float r = length(pos);
+    if (r < 1e-8) r = 1e-8; // Regularize r = 0
+
+    // Convention: Y-axis is the polar (symmetry) axis so orbitals
+    // display upright on screen (camera up = +Y).
+    // θ is measured from +Y, φ in the XZ-plane.
+    float cos_theta = pos.y / r;
+    float phi = atan(pos.z, pos.x);
+
+    float R = radial_wavefunction(n, l, Z_eff, r);
+    vec2 Y = spherical_harmonic(l, m, cos_theta, phi);
+
+    return R * Y;  // vec2 * float → vec2
+}
+
+// ======================== MAIN COMPUTE KERNEL ========================
+
+void main() {
+    uvec3 gid = gl_GlobalInvocationID;
+    int G = qpc.gridDim;
+
+    // Bounds check
+    if (gid.x >= G || gid.y >= G || gid.z >= G) return;
+
+    // Map voxel to physical coordinates in Bohr radii
+    // Grid spans [-boxHalf, +boxHalf]³
+    float inv_G = 1.0 / float(G);
+    vec3 pos = (vec3(gid) + 0.5) * inv_G * 2.0 * qpc.boxHalf - vec3(qpc.boxHalf);
+
+    // Accumulate probability density from all active orbitals
+    float total_density = 0.0;
+    float signed_sum = 0.0;   // For signed Re(ψ) output mode
+
+    for (int i = 0; i < qpc.numOrbitals; i++) {
+        OrbitalConfig oc = orb.orbitals[i];
+        if (oc.occupation < 0.001) continue; // Skip empty orbitals
+
+        vec2 psi = hydrogen_wavefunction(oc.n, oc.l, oc.m, oc.Z_eff, pos);
+
+        // Apply time-dependent phase for animation (optional)
+        // ψ(t) = ψ · e^{-iEt/ħ}  →  phase rotation in complex plane
+        if (oc.phase_t != 0.0) {
+            float c = cos(oc.phase_t + qpc.time);
+            float s = sin(oc.phase_t + qpc.time);
+            psi = vec2(psi.x * c - psi.y * s,
+                       psi.x * s + psi.y * c);
+        }
+
+        // |ψ|² weighted by occupation number
+        float prob = (psi.x * psi.x + psi.y * psi.y) * oc.occupation;
+        total_density += prob;
+
+        // Signed wavefunction for nodal surface visualization
+        signed_sum += psi.x * sqrt(oc.occupation);
+    }
+
+    // Write output based on mode
+    float out_val;
+    if (qpc.outputMode == 0) {
+        // Standard probability density |ψ|² · scale
+        out_val = total_density * qpc.densityScale;
+    } else if (qpc.outputMode == 1) {
+        // Signed Re(ψ) — reveals nodal surfaces (positive/negative lobes)
+        out_val = signed_sum * qpc.densityScale;
+    } else {
+        // Phase-encoded: store total_density, phase accessible via signed_sum sign
+        out_val = total_density * qpc.densityScale * sign(signed_sum + 1e-10);
+    }
+
+    // Linear index into 3D grid buffer
+    uint idx = gid.z * uint(G) * uint(G) + gid.y * uint(G) + gid.x;
+    grid.density[idx] = out_val;
+
+    // Also write signed wavefunction for phase/nodal visualization
+    signedOut.signedPsi[idx] = signed_sum * qpc.densityScale;
+}

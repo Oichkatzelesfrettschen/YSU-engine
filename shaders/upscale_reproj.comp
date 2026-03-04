@@ -1,0 +1,244 @@
+/* upscale_reproj.comp — Pass 1: Temporal Reprojection
+ *
+ * For each output (high-res) pixel:
+ *   1. Map to low-res coordinates
+ *   2. Sample current frame color + depth + motion vector
+ *   3. Reproject into history buffer using motion vector
+ *   4. Bicubic Catmull-Rom sample of history
+ *   5. Variance-based AABB clamping in YCoCg space
+ *   6. Disocclusion detection (depth, MV divergence, screen bounds)
+ *   7. Output: reprojected color + confidence mask
+ *
+ * Workgroup: 16×16 threads, one thread per high-res output pixel.
+ */
+
+#version 450
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+/* ─── Bindings (Set 0) ─── */
+layout(set = 0, binding = 0) uniform sampler2D u_color_lo;      /* current frame, low-res */
+layout(set = 0, binding = 1) uniform sampler2D u_depth_lo;      /* linear depth, low-res */
+layout(set = 0, binding = 2) uniform sampler2D u_motion_vec;    /* screen-space MV, low-res */
+layout(set = 0, binding = 3) uniform sampler2D u_history_hi;    /* previous frame output, high-res */
+layout(set = 0, binding = 4, rgba16f) uniform writeonly image2D o_reproj_hi;   /* reprojected color */
+layout(set = 0, binding = 5, r16f)    uniform writeonly image2D o_confidence;  /* confidence mask */
+
+/* ─── Push constants (mirrors YsuReprojPC in ysu_upscale.h) ─── */
+layout(push_constant) uniform PC {
+    uint  w_lo, h_lo;
+    uint  w_hi, h_hi;
+    float jitter_x, jitter_y;
+    float clamp_gamma;
+    float near_z, far_z;
+    uint  frame_index;
+    int   debug_mode;
+    float _pad;
+} pc;
+
+/* ═══════════════════════════════════════════════════════════════════
+ *  Color space conversions: RGB ↔ YCoCg
+ * ═══════════════════════════════════════════════════════════════════ */
+
+vec3 rgb_to_ycocg(vec3 c) {
+    return vec3(
+         0.25 * c.r + 0.50 * c.g + 0.25 * c.b,   /* Y  */
+         0.50 * c.r              - 0.50 * c.b,     /* Co */
+        -0.25 * c.r + 0.50 * c.g - 0.25 * c.b     /* Cg */
+    );
+}
+
+vec3 ycocg_to_rgb(vec3 c) {
+    float Y  = c.x;
+    float Co = c.y;
+    float Cg = c.z;
+    return vec3(
+        Y + Co - Cg,
+        Y      + Cg,
+        Y - Co - Cg
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ *  Bicubic Catmull-Rom (4-tap separable)
+ *
+ *  Higher quality than bilinear for history sampling — preserves
+ *  sub-pixel detail that the neural network needs.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+vec4 catmull_rom_weights(float t) {
+    /* Catmull-Rom basis:
+     *   w0 = -0.5t³ + t² - 0.5t
+     *   w1 =  1.5t³ - 2.5t² + 1
+     *   w2 = -1.5t³ + 2t² + 0.5t
+     *   w3 =  0.5t³ - 0.5t²           */
+    float t2 = t * t;
+    float t3 = t2 * t;
+    return vec4(
+        -0.5*t3 + t2 - 0.5*t,
+         1.5*t3 - 2.5*t2 + 1.0,
+        -1.5*t3 + 2.0*t2 + 0.5*t,
+         0.5*t3 - 0.5*t2
+    );
+}
+
+vec4 sample_catmull_rom(sampler2D tex, vec2 uv, vec2 tex_size) {
+    vec2 pos = uv * tex_size - 0.5;
+    vec2 f   = fract(pos);
+    vec2 p   = floor(pos) + 0.5; /* center of the nearest texel */
+
+    vec4 wx = catmull_rom_weights(f.x);
+    vec4 wy = catmull_rom_weights(f.y);
+
+    /* Collapse 4 taps into 2 bilinear fetches per axis (9 → 4 texture reads)
+     * by combining adjacent weights and adjusting UV offsets.               */
+    vec2 w01 = vec2(wx.x + wx.y, wy.x + wy.y);
+    vec2 w23 = vec2(wx.z + wx.w, wy.z + wy.w);
+
+    vec2 s01 = vec2(wx.y, wy.y) / max(w01, vec2(1e-6));
+    vec2 s23 = vec2(wx.z, wy.z) / max(w23, vec2(1e-6));
+
+    vec2 uv01 = (p - 1.0 + s01) / tex_size;
+    vec2 uv23 = (p + 1.0 + s23) / tex_size;
+
+    vec4 c00 = textureLod(tex, vec2(uv01.x, uv01.y), 0.0);
+    vec4 c10 = textureLod(tex, vec2(uv23.x, uv01.y), 0.0);
+    vec4 c01 = textureLod(tex, vec2(uv01.x, uv23.y), 0.0);
+    vec4 c11 = textureLod(tex, vec2(uv23.x, uv23.y), 0.0);
+
+    float sw0 = w01.x * w01.y;
+    float sw1 = w23.x * w01.y;
+    float sw2 = w01.x * w23.y;
+    float sw3 = w23.x * w23.y;
+    float sw_total = sw0 + sw1 + sw2 + sw3;
+
+    return (c00 * sw0 + c10 * sw1 + c01 * sw2 + c11 * sw3) / max(sw_total, 1e-6);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ *  HDR tone-mapping for temporal clamping
+ *
+ *  Apply Reinhard-style tonemap before clamping to prevent bright
+ *  fireflies from dominating the variance AABB. Inverse after clamp.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+vec3 tonemap(vec3 c) {
+    return c / (1.0 + max(c.r, max(c.g, c.b)));
+}
+
+vec3 tonemap_inv(vec3 c) {
+    return c / max(1.0 - max(c.r, max(c.g, c.b)), 1e-6);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ *  Main
+ * ═══════════════════════════════════════════════════════════════════ */
+
+void main() {
+    ivec2 pix_hi = ivec2(gl_GlobalInvocationID.xy);
+    if (pix_hi.x >= int(pc.w_hi) || pix_hi.y >= int(pc.h_hi)) return;
+
+    float ratio_x = float(pc.w_hi) / float(pc.w_lo);
+    float ratio_y = float(pc.h_hi) / float(pc.h_lo);
+
+    /* ── Map high-res pixel to low-res UV ── */
+    vec2 uv_lo = (vec2(pix_hi) + 0.5) / vec2(float(pc.w_hi), float(pc.h_hi));
+
+    /* ── Sample current frame data at low-res ── */
+    vec3 color_curr = textureLod(u_color_lo, uv_lo, 0.0).rgb;
+    float depth     = textureLod(u_depth_lo, uv_lo, 0.0).r;
+    vec2 mv         = textureLod(u_motion_vec, uv_lo, 0.0).rg;
+
+    /* ── Reproject: find where this pixel was in the previous frame ── */
+    /* MV is in low-res pixel coordinates. Convert to UV offset. */
+    vec2 mv_uv = mv / vec2(float(pc.w_lo), float(pc.h_lo));
+    vec2 uv_prev = uv_lo + mv_uv;
+
+    /* ── Disocclusion detection ── */
+    float confidence = 1.0;
+
+    /* Check 1: out of screen bounds */
+    if (uv_prev.x < 0.0 || uv_prev.x > 1.0 ||
+        uv_prev.y < 0.0 || uv_prev.y > 1.0) {
+        confidence = 0.0;
+    }
+
+    /* Check 2: depth discontinuity */
+    float depth_prev = textureLod(u_depth_lo, uv_prev, 0.0).r;
+    float depth_diff = abs(depth - depth_prev) / max(depth, 1e-6);
+    if (depth_diff > 0.05) {
+        confidence *= max(0.0, 1.0 - depth_diff * 10.0);
+    }
+
+    /* Check 3: motion vector magnitude-based degradation
+     * Very fast motion = less reliable reprojection */
+    float mv_len = length(mv);
+    if (mv_len > 32.0) { /* > 32 low-res pixels of motion */
+        confidence *= max(0.0, 1.0 - (mv_len - 32.0) / 64.0);
+    }
+
+    /* ── Sample history via bicubic Catmull-Rom ── */
+    vec2 hist_size = vec2(float(pc.w_hi), float(pc.h_hi));
+    vec3 hist_color = sample_catmull_rom(u_history_hi, uv_prev, hist_size).rgb;
+
+    /* ── Variance-based AABB clamping in YCoCg ── */
+    /* Compute 3×3 neighborhood statistics of current frame */
+    vec3 m1 = vec3(0.0); /* Σ color */
+    vec3 m2 = vec3(0.0); /* Σ color² */
+
+    vec2 lo_texel = 1.0 / vec2(float(pc.w_lo), float(pc.h_lo));
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            vec2 offset = vec2(float(dx), float(dy)) * lo_texel;
+            vec3 s = textureLod(u_color_lo, uv_lo + offset, 0.0).rgb;
+            s = tonemap(s);       /* HDR-aware clamping */
+            s = rgb_to_ycocg(s);  /* perceptual space */
+            m1 += s;
+            m2 += s * s;
+        }
+    }
+
+    m1 /= 9.0;
+    m2 /= 9.0;
+    vec3 sigma = sqrt(max(m2 - m1 * m1, vec3(0.0)));
+
+    float gamma = pc.clamp_gamma;
+    vec3 aabb_min = m1 - gamma * sigma;
+    vec3 aabb_max = m1 + gamma * sigma;
+
+    /* Clamp history in YCoCg space */
+    vec3 hist_ycocg = rgb_to_ycocg(tonemap(hist_color));
+    vec3 hist_clamped_ycocg = clamp(hist_ycocg, aabb_min, aabb_max);
+
+    /* Measure how much we had to clamp — additional confidence reduction */
+    float clamp_dist = length(hist_ycocg - hist_clamped_ycocg);
+    if (clamp_dist > 0.001) {
+        confidence *= max(0.0, 1.0 - clamp_dist * 5.0);
+    }
+
+    /* Convert back to RGB linear */
+    vec3 reproj_color = tonemap_inv(ycocg_to_rgb(hist_clamped_ycocg));
+
+    /* ── For first frame, no valid history — use current color ── */
+    if (pc.frame_index == 0u) {
+        reproj_color = color_curr;
+        confidence = 0.0; /* force full current frame usage */
+    }
+
+    /* ── Debug visualization ── */
+    if (pc.debug_mode == 1) {
+        /* Confidence heatmap: red=low, green=high */
+        reproj_color = mix(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), confidence);
+    } else if (pc.debug_mode == 2) {
+        /* Show rejected pixels in red */
+        if (confidence < 0.3) reproj_color = vec3(1.0, 0.0, 0.0);
+    } else if (pc.debug_mode == 3) {
+        /* Flow visualization */
+        reproj_color = vec3(mv.x * 0.1 + 0.5, mv.y * 0.1 + 0.5, 0.0);
+    }
+
+    /* ── Write outputs ── */
+    imageStore(o_reproj_hi, pix_hi, vec4(reproj_color, 1.0));
+    imageStore(o_confidence, pix_hi, vec4(confidence, 0.0, 0.0, 0.0));
+}

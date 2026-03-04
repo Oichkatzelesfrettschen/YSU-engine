@@ -1,0 +1,9 @@
+Place exported NeRF artifacts here.
+
+Expected files:
+- nerf_hashgrid.bin (custom binary, see NERF_CUSTOM_FORMAT.md)
+- occupancy_grid.bin (binary occupancy grid)
+
+Set env vars:
+- YSU_NERF_HASHGRID=models/nerf_hashgrid.bin
+- YSU_NERF_OCC=models/occupancy_grid.bin

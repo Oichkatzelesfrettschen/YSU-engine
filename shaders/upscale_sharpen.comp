@@ -1,0 +1,195 @@
+/* upscale_sharpen.comp — Pass 3: Contrast-Adaptive Sharpening + History Update
+ *
+ * Applies AMD FidelityFX CAS-style adaptive sharpening to the upscaled output,
+ * then writes both the display target and the history buffer for next frame.
+ *
+ * CAS algorithm:
+ *   For each pixel, compute the min/max of a cross-shaped (5-tap) neighborhood.
+ *   The local contrast ratio determines how much sharpening to apply.
+ *   Low-contrast regions get more sharpening; high-contrast edges get less
+ *   (prevents ringing / overshoot on hard edges).
+ *
+ * Workgroup: 16×16 threads, one thread per high-res output pixel.
+ */
+
+#version 450
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+/* ─── Bindings (Set 2) ─── */
+layout(set = 0, binding = 0, rgba16f) uniform readonly  image2D u_input;     /* upscaled output from Pass 2 */
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D o_history;    /* history buffer for next frame */
+layout(set = 0, binding = 2, rgba16f) uniform writeonly image2D o_display;    /* final display target */
+
+/* ─── Push constants (mirrors YsuSharpenPC) ─── */
+layout(push_constant) uniform PC {
+    uint  w_hi, h_hi;
+    float sharpness;     /* 0.0 = no sharpening, 1.0 = maximum */
+    int   debug_mode;
+} pc;
+
+/* ═══════════════════════════════════════════════════════════════════
+ *  Luminance helper (Rec.709)
+ * ═══════════════════════════════════════════════════════════════════ */
+
+float luminance(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ *  Contrast-Adaptive Sharpening (CAS)
+ *
+ *  Based on the technique from AMD FidelityFX CAS.
+ *  Uses a modified Lanczos-like sharpening kernel whose strength
+ *  adapts to local contrast.
+ *
+ *  Cross neighborhood (5 taps):
+ *       T
+ *    L  C  R
+ *       B
+ *
+ *  Sharpened = C + (C - (T+B+L+R)/4) * strength
+ *  where strength = sharpness * (1 - local_contrast)
+ * ═══════════════════════════════════════════════════════════════════ */
+
+vec3 apply_cas(ivec2 p) {
+    vec3 c = imageLoad(u_input, p).rgb;
+    vec3 t = imageLoad(u_input, clamp(p + ivec2( 0, -1), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+    vec3 b = imageLoad(u_input, clamp(p + ivec2( 0,  1), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+    vec3 l = imageLoad(u_input, clamp(p + ivec2(-1,  0), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+    vec3 r = imageLoad(u_input, clamp(p + ivec2( 1,  0), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+
+    /* Compute luminance for contrast measurement */
+    float lum_c = luminance(c);
+    float lum_t = luminance(t);
+    float lum_b = luminance(b);
+    float lum_l = luminance(l);
+    float lum_r = luminance(r);
+
+    /* Local min/max luminance */
+    float mn = min(lum_c, min(min(lum_t, lum_b), min(lum_l, lum_r)));
+    float mx = max(lum_c, max(max(lum_t, lum_b), max(lum_l, lum_r)));
+
+    /* Local contrast ratio: high contrast = less sharpening needed
+     * This prevents ringing on hard edges (text, geometric edges). */
+    float contrast = (mx - mn) / max(mx, 1e-6);
+
+    /* Adaptive sharpening coefficient:
+     * sharpness in [0, 1], contrast dampening reduces it near edges */
+    float sharp_coeff = pc.sharpness * (1.0 - contrast * 0.75);
+    sharp_coeff = max(sharp_coeff, 0.0);
+
+    /* Standard unsharp mask with adaptive coefficient:
+     * output = center + coeff * (center - average_neighbors) */
+    vec3 avg_nb = (t + b + l + r) * 0.25;
+    vec3 detail = c - avg_nb;
+
+    vec3 sharpened = c + detail * sharp_coeff;
+
+    /* Clamp to prevent overshoot beyond local extremes (anti-ringing) */
+    vec3 nb_min = min(min(t, b), min(l, r));
+    vec3 nb_max = max(max(t, b), max(l, r));
+
+    /* Allow slight overshoot proportional to sharpness to preserve pop */
+    float margin = 0.1 * pc.sharpness;
+    sharpened = clamp(sharpened, nb_min - margin, nb_max + margin);
+
+    /* Ensure non-negative (HDR can be > 1.0) */
+    sharpened = max(sharpened, vec3(0.0));
+
+    return sharpened;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ *  RCAS (Robust Contrast-Adaptive Sharpening) variant
+ *
+ *  Additional diagonal taps for more robust edge detection.
+ *  Uses the full 3×3 neighborhood for min/max but only the
+ *  cross pattern for the sharpening kernel (avoids corner ringing).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+vec3 apply_rcas(ivec2 p) {
+    /* Cross taps */
+    vec3 c = imageLoad(u_input, p).rgb;
+    vec3 t = imageLoad(u_input, clamp(p + ivec2( 0, -1), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+    vec3 b = imageLoad(u_input, clamp(p + ivec2( 0,  1), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+    vec3 l = imageLoad(u_input, clamp(p + ivec2(-1,  0), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+    vec3 r = imageLoad(u_input, clamp(p + ivec2( 1,  0), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+
+    /* Diagonal taps for robust min/max */
+    vec3 tl = imageLoad(u_input, clamp(p + ivec2(-1, -1), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+    vec3 tr = imageLoad(u_input, clamp(p + ivec2( 1, -1), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+    vec3 bl = imageLoad(u_input, clamp(p + ivec2(-1,  1), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+    vec3 br = imageLoad(u_input, clamp(p + ivec2( 1,  1), ivec2(0), ivec2(pc.w_hi-1, pc.h_hi-1))).rgb;
+
+    /* Luminances — all 9 taps */
+    float lum_c  = luminance(c);
+    float lum_mn = min(lum_c, min(min(luminance(t), luminance(b)),
+                                   min(luminance(l), luminance(r))));
+    float lum_mx = max(lum_c, max(max(luminance(t), luminance(b)),
+                                   max(luminance(l), luminance(r))));
+    /* Extend with diagonals */
+    lum_mn = min(lum_mn, min(min(luminance(tl), luminance(tr)),
+                              min(luminance(bl), luminance(br))));
+    lum_mx = max(lum_mx, max(max(luminance(tl), luminance(tr)),
+                              max(luminance(bl), luminance(br))));
+
+    /* RCAS weight: 
+     * w = sqrt(min_lum / max_lum) clamped — measures how "flat" the region is.
+     * Flat regions get full sharpening; high-contrast edges get minimal. */
+    float amp = sqrt(clamp(lum_mn / max(lum_mx, 1e-6), 0.0, 1.0));
+    amp = mix(0.0, 1.0, amp); /* linearize */
+
+    float w = -0.25 * pc.sharpness * amp; /* negative = sharpen (unsharp mask convention) */
+
+    /* Weighted sum: (1 - 4w) * center + w * (T + B + L + R) */
+    vec3 result = c * (1.0 - 4.0 * w) + (t + b + l + r) * w;
+
+    /* Anti-ringing clamp using full 3×3 neighborhood */
+    vec3 full_min = min(min(min(t, b), min(l, r)), min(min(tl, tr), min(bl, br)));
+    full_min = min(full_min, c);
+    vec3 full_max = max(max(max(t, b), max(l, r)), max(max(tl, tr), max(bl, br)));
+    full_max = max(full_max, c);
+
+    result = clamp(result, full_min, full_max);
+    result = max(result, vec3(0.0));
+
+    return result;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ *  Main
+ * ═══════════════════════════════════════════════════════════════════ */
+
+void main() {
+    ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+    if (pix.x >= int(pc.w_hi) || pix.y >= int(pc.h_hi)) return;
+
+    vec3 color;
+
+    if (pc.sharpness > 0.001) {
+        /* Use RCAS for higher quality (9 taps vs 5) */
+        color = apply_rcas(pix);
+    } else {
+        /* No sharpening — passthrough */
+        color = imageLoad(u_input, pix).rgb;
+    }
+
+    /* ── Debug overlays ── */
+    if (pc.debug_mode == 4) {
+        /* Split-screen: left = sharpened upscale, right = raw input */
+        if (pix.x >= int(pc.w_hi) / 2) {
+            color = imageLoad(u_input, pix).rgb;
+        }
+        /* Draw center divider line */
+        if (abs(pix.x - int(pc.w_hi) / 2) < 2) {
+            color = vec3(1.0, 1.0, 0.0); /* yellow line */
+        }
+    }
+
+    /* ── Write to both display target and history buffer ── */
+    vec4 out_val = vec4(color, 1.0);
+    imageStore(o_display, pix, out_val);
+    imageStore(o_history, pix, out_val); /* history = post-sharpen for next frame's reprojection */
+}

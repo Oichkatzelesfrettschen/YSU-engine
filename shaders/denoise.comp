@@ -1,0 +1,110 @@
+#version 450
+layout(local_size_x=16, local_size_y=16, local_size_z=1) in;
+
+layout(push_constant) uniform Push {
+    int W;
+    int H;
+    int pass;           // 0=horizontal, 1=vertical
+    int radius;         // filter radius
+    float sigma_s;      // spatial std dev
+    float sigma_r;      // range std dev
+    int pad0;
+    int pad1;
+} pc;
+
+layout(set=0, binding=0, rgba32f) readonly uniform image2D inImg;
+layout(set=0, binding=1, rgba32f) writeonly uniform image2D outImg;
+
+// Shared memory for per-workgroup spatial kernel cache (avoid repeated exp calls)
+const int MAX_RADIUS = 16;
+shared float s_spatial[2 * MAX_RADIUS + 1];
+
+// Gaussian kernels (use fast polynomial approximation instead of exp)
+float gauss_spatial(float dist_sq) {
+    float sigma_s_sq = pc.sigma_s * pc.sigma_s;
+    float x = dist_sq / (2.0 * sigma_s_sq);
+    if(x > 4.0) return 0.0;  // Early exit: negligible contribution
+    // Polynomial approx: exp(-x) ≈ max(0, 1 - x + 0.5*x^2) for x in [0, 4]
+    return max(0.0, 1.0 - x + 0.5 * x * x);
+}
+
+float gauss_range(float color_diff_sq) {
+    float sigma_r_sq = pc.sigma_r * pc.sigma_r;
+    float x = color_diff_sq / (2.0 * sigma_r_sq);
+    if(x > 4.0) return 0.0;  // Early exit
+    return max(0.0, 1.0 - x + 0.5 * x * x);
+}
+
+// Rec.709 luminance (perceptually accurate)
+float luminance(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+void main(){
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if(gid.x >= pc.W || gid.y >= pc.H) return;
+
+    // Initialize shared spatial kernel cache once per workgroup
+    int r = min(pc.radius, MAX_RADIUS);
+    int local_idx = int(gl_LocalInvocationIndex);
+    if(local_idx < 2 * MAX_RADIUS + 1){
+        int i = local_idx - MAX_RADIUS;
+        if(i <= r && i >= -r){
+            s_spatial[local_idx] = gauss_spatial(float(i * i));
+        }
+    }
+    barrier();
+
+    vec4 center_sample = imageLoad(inImg, gid);
+    vec3 center_col = center_sample.rgb;
+    float center_lum = luminance(center_col);
+
+    vec3 sum = vec3(0.0);
+    float weight_sum = 0.0;
+
+    if(pc.pass == 0) {
+        // Horizontal pass: filter along x-axis
+        int r_use = min(pc.radius, MAX_RADIUS);
+        for(int dx = -r_use; dx <= r_use; dx++) {
+            int nx = gid.x + dx;
+            if(nx < 0 || nx >= pc.W) continue;
+
+            vec4 neighbor_sample = imageLoad(inImg, ivec2(nx, gid.y));
+            vec3 neighbor_col = neighbor_sample.rgb;
+            float neighbor_lum = luminance(neighbor_col);
+
+            float lum_diff_sq = (center_lum - neighbor_lum) * (center_lum - neighbor_lum);
+
+            float w_spatial = s_spatial[dx + MAX_RADIUS];
+            float w_range = gauss_range(lum_diff_sq);
+            float weight = w_spatial * w_range;
+
+            sum += neighbor_col * weight;
+            weight_sum += weight;
+        }
+    } else {
+        // Vertical pass: filter along y-axis
+        int r_use = min(pc.radius, MAX_RADIUS);
+        for(int dy = -r_use; dy <= r_use; dy++) {
+            int ny = gid.y + dy;
+            if(ny < 0 || ny >= pc.H) continue;
+
+            vec4 neighbor_sample = imageLoad(inImg, ivec2(gid.x, ny));
+            vec3 neighbor_col = neighbor_sample.rgb;
+            float neighbor_lum = luminance(neighbor_col);
+
+            float lum_diff_sq = (center_lum - neighbor_lum) * (center_lum - neighbor_lum);
+
+            float w_spatial = s_spatial[dy + MAX_RADIUS];
+            float w_range = gauss_range(lum_diff_sq);
+            float weight = w_spatial * w_range;
+
+            sum += neighbor_col * weight;
+            weight_sum += weight;
+        }
+    }
+
+    // Normalize and write
+    vec3 result = (weight_sum > 1e-6) ? sum / weight_sum : center_col;
+    imageStore(outImg, gid, vec4(result, center_sample.a));
+}

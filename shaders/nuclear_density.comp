@@ -1,0 +1,95 @@
+// nuclear_density.comp — Evaluate nucleon density on a 3D grid.
+//
+// Each nucleon is a Gaussian blob: ρ_i(r) = exp(-|r - r_i|² / 2σ²)
+// Total density = Σ ρ_i
+// Signed channel = Σ(proton ρ) - Σ(neutron ρ)   (for proton/neutron coloring)
+//
+// This replaces quantum_wavefunction.comp when in nuclear reaction mode.
+// The output density/signed SSBOs are read by quantum_raymarch.comp.
+
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+// Output: total nucleon density (binding matches quantum_wavefunction.comp)
+layout(std430, set=0, binding=0) buffer DensityGrid {
+    float density[];
+} grid;
+
+// Output: signed (proton - neutron) density for coloring
+layout(std430, set=0, binding=1) buffer SignedGrid {
+    float signedPsi[];
+} signedOut;
+
+// Input: nucleon positions and types
+struct Nucleon {
+    float x, y, z;       // position (fm)
+    float radius;         // display radius (unused in density, kept for alignment)
+    int   type;           // 0 = neutron, 1 = proton
+    int   group;          // which fragment
+    float pad0, pad1;
+};
+
+layout(std430, set=0, binding=2) readonly buffer NucleonBuf {
+    Nucleon nucleons[];
+} nb;
+
+layout(push_constant) uniform NuclearPush {
+    int   gridDim;        // grid resolution per axis
+    int   numNucleons;    // active nucleon count
+    float boxHalf;        // half-extent of volume (fm)
+    float sigma;          // Gaussian width (fm), typically 0.55
+    float densityScale;   // global multiplier
+    float energyGlow;     // extra glow for excitation phase (0-1)
+    int   pad0, pad1;
+} npc;
+
+void main() {
+    uvec3 gid = gl_GlobalInvocationID;
+    int G = npc.gridDim;
+
+    if (gid.x >= G || gid.y >= G || gid.z >= G) return;
+
+    // Map voxel → physical position in femtometers
+    float inv_G = 1.0 / float(G);
+    vec3 pos = (vec3(gid) + 0.5) * inv_G * 2.0 * npc.boxHalf - vec3(npc.boxHalf);
+
+    float total    = 0.0;
+    float proton_d = 0.0;
+    float neutron_d = 0.0;
+
+    float inv_2s2 = 1.0 / (2.0 * npc.sigma * npc.sigma);
+
+    for (int i = 0; i < npc.numNucleons; i++) {
+        Nucleon n = nb.nucleons[i];
+        vec3 npos = vec3(n.x, n.y, n.z);
+        float r2 = dot(pos - npos, pos - npos);
+
+        // Skip far-away nucleons (> 4σ contributes < 0.03%)
+        if (r2 > 16.0 * npc.sigma * npc.sigma) continue;
+
+        float g = exp(-r2 * inv_2s2);
+        total += g;
+
+        if (n.type == 1)
+            proton_d += g;
+        else
+            neutron_d += g;
+    }
+
+    // Optional: add a diffuse energy glow during excitation/tunneling
+    if (npc.energyGlow > 0.0) {
+        // Spherical glow centered at origin, radius proportional to nucleus
+        float r = length(pos);
+        float glow_r = npc.boxHalf * 0.3;
+        float glow = npc.energyGlow * exp(-r * r / (2.0 * glow_r * glow_r)) * 0.3;
+        total += glow;
+        // Energy glow is "neutral" — equal proton/neutron contribution
+        proton_d += glow * 0.5;
+        neutron_d += glow * 0.5;
+    }
+
+    uint idx = gid.z * uint(G) * uint(G) + gid.y * uint(G) + gid.x;
+    grid.density[idx]      = total * npc.densityScale;
+    // Positive = proton-rich, negative = neutron-rich
+    signedOut.signedPsi[idx] = (proton_d - neutron_d) * npc.densityScale;
+}

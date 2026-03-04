@@ -1,0 +1,181 @@
+// thermal_diffusion.comp — GPU-accelerated 3D heat equation solver.
+//
+// Solves: ∂T/∂t = α(mat)·∇²T + q̇/(ρ·c_p)
+// Method: Explicit Euler with 6-point Laplacian stencil (Jacobi iteration).
+//
+// Material-aware: thermal diffusivity α = k/(ρ·c_p) varies per cell.
+// Ping-pong: reads from binding 0, writes to binding 1 (swapped each iteration).
+//
+// References:
+//   UO₂ fuel: k = 100/(7.5+17.7t+3.6t²) + 6400/t^2.5·exp(-16.35/t), t=T/1000
+//   Zircaloy-4: k = 12.767 + 0.00574·T
+//   Water: k ≈ 0.6 (liquid) / 0.03 (steam)
+//   Graphite: k ≈ 50·exp(-3e-4·(T-300)) + 10
+//   B₄C: k ≈ 30 - 0.005·(T-300)
+
+#version 450
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+// Binding 0: temperature input (read)
+layout(std430, set=0, binding=0) readonly buffer TempIn {
+    float temp_in[];
+};
+
+// Binding 1: temperature output (write)
+layout(std430, set=0, binding=1) writeonly buffer TempOut {
+    float temp_out[];
+};
+
+// Binding 2: volumetric heat source (W/m³)
+layout(std430, set=0, binding=2) readonly buffer HeatSource {
+    float heat_src[];
+};
+
+// Binding 3: material ID per cell (int packed as uint)
+layout(std430, set=0, binding=3) readonly buffer MaterialID {
+    int mat_id[];
+};
+
+layout(push_constant) uniform ThermalPush {
+    int   gridDim;       // Grid resolution (same on all axes)
+    float boxHalf;       // Half-extent of domain (meters)
+    float dt;            // Time step (seconds)
+    int   iteration;     // Current iteration number (for ping-pong)
+    float maxTemp;       // Maximum allowed temperature (K)
+    float pad0, pad1, pad2;
+} pc;
+
+// ═══════════ Material constants ═══════════
+// Material IDs (match RT_Material enum in reactor_thermal.h):
+//   0 = VOID, 1 = FUEL_UO2, 2 = CLAD_ZR4, 3 = COOLANT_H2O,
+//   4 = MODERATOR_C, 5 = CONTROL_B4C
+
+// Temperature-dependent thermal diffusivity α = k/(ρ·c_p)
+float get_diffusivity(int mat, float T) {
+    float k, rho, cp;
+
+    if (mat == 1) { // UO₂ fuel
+        float t = T / 1000.0;
+        if (t < 0.3) t = 0.3;
+        k = 100.0 / (7.5408 + 17.692 * t + 3.6142 * t * t)
+            + (6400.0 / pow(t, 2.5)) * exp(-16.35 / t);
+        rho = 10970.0 * (1.0 - 3.0 * 10.0e-6 * (T - 300.0));
+        cp  = 302.27 + 0.0285 * T;
+    }
+    else if (mat == 2) { // Zircaloy-4
+        k   = 12.767 + 0.00574 * T;
+        rho = 6550.0 * (1.0 - 3.0 * 5.7e-6 * (T - 300.0));
+        cp  = (T < 1100.0) ? (281.0 + 0.0306 * T) : 360.0;
+    }
+    else if (mat == 3) { // Water (simplified: liquid properties)
+        k   = 0.686 - 0.0004 * (T - 373.15);
+        rho = 760.0 - 0.5 * (T - 543.15);
+        cp  = 4200.0 + 3.0 * (T - 543.15);
+        // Clamp for stability
+        if (rho < 36.0) rho = 36.0;
+        if (k < 0.025) k = 0.025;
+    }
+    else if (mat == 4) { // Graphite moderator
+        k   = 50.0 * exp(-0.0003 * (T - 300.0)) + 10.0;
+        rho = 1700.0;
+        cp  = 710.0 + 0.40 * (T - 300.0);
+    }
+    else if (mat == 5) { // B₄C control rod
+        k   = 30.0 - 0.005 * (T - 300.0);
+        rho = 2520.0;
+        cp  = 960.0 + 0.25 * (T - 300.0);
+    }
+    else { // VOID — minimal thermal properties
+        return 1.0e-7;
+    }
+
+    float denom = rho * cp;
+    if (denom < 1.0) denom = 1.0;
+    return k / denom;
+}
+
+// Get ρ·c_p for source term scaling
+float get_rho_cp(int mat, float T) {
+    float rho, cp;
+
+    if (mat == 1) { // UO₂
+        rho = 10970.0 * (1.0 - 3.0 * 10.0e-6 * (T - 300.0));
+        cp  = 302.27 + 0.0285 * T;
+    }
+    else if (mat == 2) { // Zircaloy
+        rho = 6550.0 * (1.0 - 3.0 * 5.7e-6 * (T - 300.0));
+        cp  = (T < 1100.0) ? (281.0 + 0.0306 * T) : 360.0;
+    }
+    else if (mat == 3) { // Water
+        rho = max(760.0 - 0.5 * (T - 543.15), 36.0);
+        cp  = 4200.0 + 3.0 * (T - 543.15);
+    }
+    else if (mat == 4) { // Graphite
+        rho = 1700.0;
+        cp  = 710.0 + 0.40 * (T - 300.0);
+    }
+    else if (mat == 5) { // B₄C
+        rho = 2520.0;
+        cp  = 960.0 + 0.25 * (T - 300.0);
+    }
+    else {
+        return 1.0;
+    }
+    return max(rho * cp, 1.0);
+}
+
+// ═══════════ Main compute ═══════════
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    int G = pc.gridDim;
+
+    // Bounds check
+    if (gid.x >= G || gid.y >= G || gid.z >= G) return;
+
+    int idx = gid.z * G * G + gid.y * G + gid.x;
+    int mat = mat_id[idx];
+
+    // Skip void cells
+    if (mat == 0) {
+        temp_out[idx] = temp_in[idx];
+        return;
+    }
+
+    float T_c = temp_in[idx];
+    float dx = 2.0 * pc.boxHalf / float(G);
+
+    // ─── 6-point Laplacian with Neumann BC (zero flux at boundaries) ───
+    float T_xp = (gid.x < G - 1) ? temp_in[idx + 1]     : T_c;
+    float T_xm = (gid.x > 0)     ? temp_in[idx - 1]     : T_c;
+    float T_yp = (gid.y < G - 1) ? temp_in[idx + G]     : T_c;
+    float T_ym = (gid.y > 0)     ? temp_in[idx - G]     : T_c;
+    float T_zp = (gid.z < G - 1) ? temp_in[idx + G * G] : T_c;
+    float T_zm = (gid.z > 0)     ? temp_in[idx - G * G] : T_c;
+
+    float laplacian = (T_xp + T_xm + T_yp + T_ym + T_zp + T_zm - 6.0 * T_c)
+                      / (dx * dx);
+
+    // ─── Material-dependent diffusivity ───
+    float alpha = get_diffusivity(mat, T_c);
+
+    // ─── Heat source term: q̇ / (ρ·c_p) ───
+    float rho_cp = get_rho_cp(mat, T_c);
+    float source = heat_src[idx] / rho_cp;
+
+    // ─── Explicit Euler time integration ───
+    // T^{n+1} = T^n + dt × (α·∇²T + q̇/(ρ·c_p))
+    float dT = (alpha * laplacian + source) * pc.dt;
+
+    // ─── CFL stability limiter ───
+    // For explicit scheme: dt < dx²/(6α) for 3D
+    // Instead of reducing dt, clamp the temperature change
+    float max_dT = 500.0;  // Max K change per iteration
+    dT = clamp(dT, -max_dT, max_dT);
+
+    float T_new = T_c + dT;
+
+    // Clamp to physical range
+    T_new = clamp(T_new, 200.0, pc.maxTemp);
+
+    temp_out[idx] = T_new;
+}
