@@ -1,0 +1,27 @@
+﻿digraph f {
+subgraph "cluster_probe_i2i" {
+node [fontname="Courier",fontsize=10,shape=Mrecord];
+"probe_i2i"
+[label="{<entry>	.global		probe_i2i\l	.type		probe_i2i,@function\l	.size		probe_i2i,(.L_x_5\ -\ probe_i2i)\l	.other		probe_i2i,\<no\ object\>\lprobe_i2i:\l.text.probe_i2i:\l\ \ IMAD.MOV.U32\ R1,\ RZ,\ RZ,\ c\[0x0\]\[0x28\]\ ;\l\ \ S2R\ R4,\ SR_TID.X\ ;\l\ \ MOV\ R3,\ 0x2\ ;\l\ \ ULDC.64\ UR4,\ c\[0x0\]\[0x118\]\ ;\l\ \ IADD3\ R6,\ P0,\ R4,\ c\[0x0\]\[0x170\],\ RZ\ ;\l\ \ IMAD.WIDE\ R2,\ R4.reuse,\ R3,\ c\[0x0\]\[0x168\]\ ;\l\ \ LEA.HI.X.SX32\ R7,\ R4,\ c\[0x0\]\[0x174\],\ 0x1,\ P0\ ;\l\ \ LDG.E.U16\ R2,\ \[R2.64\]\ ;\l\ \ LDG.E.U8\ R6,\ \[R6.64\]\ ;\l\ \ IMAD.MOV.U32\ R5,\ RZ,\ RZ,\ 0x4\ ;\l\ \ IMAD.WIDE\ R4,\ R4,\ R5,\ c\[0x0\]\[0x160\]\ ;\l\ \ PRMT\ R9,\ R2,\ 0x9910,\ RZ\ ;\l\ \ PRMT\ R0,\ R6,\ 0x8880,\ RZ\ ;\l\ \ LEA\ R9,\ R9,\ R0,\ 0x1\ ;\l\ \ IMAD.IADD\ R9,\ R6,\ 0x1,\ R9\ ;\l\ \ STG.E\ \[R4.64\],\ R9\ ;\l|<exit0>\ \ EXIT\ ;\l}"]
+}
+subgraph "cluster_probe_f2f_fp64" {
+node [fontname="Courier",fontsize=10,shape=Mrecord];
+"probe_f2f_fp64"
+[label="{<entry>	.global		probe_f2f_fp64\l	.type		probe_f2f_fp64,@function\l	.size		probe_f2f_fp64,(.L_x_6\ -\ probe_f2f_fp64)\l	.other		probe_f2f_fp64,\<no\ object\>\lprobe_f2f_fp64:\l.text.probe_f2f_fp64:\l\ \ MOV\ R1,\ c\[0x0\]\[0x28\]\ ;\l\ \ S2R\ R0,\ SR_TID.X\ ;\l\ \ MOV\ R13,\ 0x8\ ;\l\ \ ULDC.64\ UR4,\ c\[0x0\]\[0x118\]\ ;\l\ \ MOV\ R3,\ 0x4\ ;\l\ \ IMAD.WIDE\ R4,\ R0,\ R13,\ c\[0x0\]\[0x170\]\ ;\l\ \ IMAD.WIDE\ R2,\ R0,\ R3,\ c\[0x0\]\[0x168\]\ ;\l\ \ LDG.E.64\ R4,\ \[R4.64\]\ ;\l\ \ LDG.E\ R2,\ \[R2.64\]\ ;\l\ \ F2F.F32.F64\ R10,\ R4\ ;\l\ \ F2F.F64.F32\ R6,\ R2\ ;\l\ \ F2F.F64.F32\ R10,\ R10\ ;\l\ \ DADD\ R8,\ R4,\ R6\ ;\l\ \ DFMA\ R8,\ R4,\ R6,\ R8\ ;\l\ \ IMAD.WIDE\ R6,\ R0,\ R13,\ c\[0x0\]\[0x160\]\ ;\l\ \ DADD\ R8,\ R8,\ R10\ ;\l\ \ STG.E.64\ \[R6.64\],\ R8\ ;\l|<exit0>\ \ EXIT\ ;\l}"]
+}
+subgraph "cluster_probe_f2f_fp16" {
+node [fontname="Courier",fontsize=10,shape=Mrecord];
+"probe_f2f_fp16"
+[label="{<entry>	.global		probe_f2f_fp16\l	.type		probe_f2f_fp16,@function\l	.size		probe_f2f_fp16,(.L_x_7\ -\ probe_f2f_fp16)\l	.other		probe_f2f_fp16,\<no\ object\>\lprobe_f2f_fp16:\l.text.probe_f2f_fp16:\l\ \ MOV\ R1,\ c\[0x0\]\[0x28\]\ ;\l\ \ S2R\ R8,\ SR_TID.X\ ;\l\ \ MOV\ R11,\ 0x4\ ;\l\ \ ULDC.64\ UR4,\ c\[0x0\]\[0x118\]\ ;\l\ \ IMAD.WIDE\ R2,\ R8,\ R11,\ c\[0x0\]\[0x168\]\ ;\l\ \ LDG.E\ R0,\ \[R2.64\]\ ;\l\ \ F2F.F16.F32.RM\ R6,\ R0\ ;\l\ \ F2FP.F16.F32.PACK_AB\ R3,\ RZ,\ R0.reuse\ ;\l\ \ F2FP.F16.F32.PACK_AB.RZ\ R5,\ RZ,\ R0\ ;\l\ \ HADD2.F32\ R4,\ -RZ,\ R3.H0_H0\ ;\l\ \ F2F.F16.F32.RP\ R7,\ R0\ ;\l\ \ HADD2.F32\ R5,\ -RZ,\ R5.H0_H0\ ;\l\ \ FADD\ R4,\ R4,\ R4\ ;\l\ \ IMAD.WIDE\ R2,\ R8,\ R11,\ c\[0x0\]\[0x160\]\ ;\l\ \ FADD\ R4,\ R4,\ R5\ ;\l\ \ HADD2.F32\ R9,\ -RZ,\ R6.H0_H0\ ;\l\ \ FADD\ R4,\ R4,\ R9\ ;\l\ \ HADD2.F32\ R7,\ -RZ,\ R7.H0_H0\ ;\l\ \ FADD\ R7,\ R4,\ R7\ ;\l\ \ STG.E\ \[R2.64\],\ R7\ ;\l|<exit0>\ \ EXIT\ ;\l}"]
+}
+subgraph "cluster_probe_i2f" {
+node [fontname="Courier",fontsize=10,shape=Mrecord];
+"probe_i2f"
+[label="{<entry>	.global		probe_i2f\l	.type		probe_i2f,@function\l	.size		probe_i2f,(.L_x_8\ -\ probe_i2f)\l	.other		probe_i2f,\<no\ object\>\lprobe_i2f:\l.text.probe_i2f:\l\ \ MOV\ R1,\ c\[0x0\]\[0x28\]\ ;\l\ \ S2R\ R8,\ SR_TID.X\ ;\l\ \ MOV\ R9,\ 0x4\ ;\l\ \ ULDC.64\ UR4,\ c\[0x0\]\[0x118\]\ ;\l\ \ IMAD.WIDE\ R2,\ R8,\ R9,\ c\[0x0\]\[0x168\]\ ;\l\ \ LDG.E\ R2,\ \[R2.64\]\ ;\l\ \ I2F.RM\ R4,\ R2\ ;\l\ \ I2FP.F32.S32\ R0,\ R2.reuse\ ;\l\ \ I2FP.F32.S32.RZ\ R5,\ R2\ ;\l\ \ I2F.RP\ R6,\ R2\ ;\l\ \ FADD\ R5,\ R0,\ R5\ ;\l\ \ I2FP.F32.U32\ R0,\ R2\ ;\l\ \ FADD\ R5,\ R4,\ R5\ ;\l\ \ FADD\ R7,\ R6,\ R5\ ;\l\ \ IMAD.WIDE\ R4,\ R8,\ R9,\ c\[0x0\]\[0x160\]\ ;\l\ \ FADD\ R7,\ R0,\ R7\ ;\l\ \ STG.E\ \[R4.64\],\ R7\ ;\l|<exit0>\ \ EXIT\ ;\l}"]
+}
+subgraph "cluster_probe_f2i" {
+node [fontname="Courier",fontsize=10,shape=Mrecord];
+"probe_f2i"
+[label="{<entry>	.global		probe_f2i\l	.type		probe_f2i,@function\l	.size		probe_f2i,(.L_x_9\ -\ probe_f2i)\l	.other		probe_f2i,\<no\ object\>\lprobe_f2i:\l.text.probe_f2i:\l\ \ MOV\ R1,\ c\[0x0\]\[0x28\]\ ;\l\ \ S2R\ R9,\ SR_TID.X\ ;\l\ \ MOV\ R10,\ 0x4\ ;\l\ \ ULDC.64\ UR4,\ c\[0x0\]\[0x118\]\ ;\l\ \ IMAD.WIDE\ R2,\ R9,\ R10,\ c\[0x0\]\[0x168\]\ ;\l\ \ LDG.E\ R2,\ \[R2.64\]\ ;\l\ \ F2I.TRUNC.NTZ\ R0,\ R2\ ;\l\ \ F2I.NTZ\ R5,\ R2\ ;\l\ \ F2I.FLOOR.NTZ\ R4,\ R2\ ;\l\ \ F2I.CEIL.NTZ\ R6,\ R2\ ;\l\ \ F2I.U32.TRUNC.NTZ\ R7,\ R2\ ;\l\ \ IADD3\ R0,\ R4,\ R5,\ R0\ ;\l\ \ IMAD.WIDE\ R4,\ R9,\ R10,\ c\[0x0\]\[0x160\]\ ;\l\ \ F2I.U32.NTZ\ R8,\ R2\ ;\l\ \ IADD3\ R7,\ R7,\ R0,\ R6\ ;\l\ \ IADD3\ R7,\ R8,\ R7,\ RZ\ ;\l\ \ STG.E\ \[R4.64\],\ R7\ ;\l|<exit0>\ \ EXIT\ ;\l}"]
+}
+}

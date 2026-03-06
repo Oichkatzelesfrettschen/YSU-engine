@@ -1,0 +1,5 @@
+# Keep analysis reports and SASS dumps, exclude binaries
+*.exe
+*.cubin
+*.o
+*.obj
