@@ -1,91 +1,92 @@
 # YSU Engine
 
-A from-scratch C11 path tracer with Vulkan GPU compute, real-time NeRF inference via hand-written AVX2/AVX-512 kernels, a Blender-style mesh editor, and nuclear reactor physics — all in ~40,000 lines of C.
+I reverse-engineered NVIDIA's Ada Lovelace GPU assembly (SASS), measured instruction latencies they don't publish, then used that to hand-write Instant-NGP's hot loops in inline PTX — **MLP inference 3.16x faster than what nvcc generates.** The whole thing sits on top of a 40,000-line C11 engine I built from scratch: path tracer, Vulkan GPU compute, NeRF inference, mesh editor, nuclear reactor sim. I'm 16.
 
-YSU (Your Simulated Universe) is an MIT-licensed, from-scratch rendering and physics simulation engine built for solo developers and researchers who need a serious raytracer without corporate strings attached. Most high-quality rendering engines are proprietary, paywalled, or too coupled to specific pipelines to adapt. YSU is none of those — it's a single codebase covering CPU path tracing, GPU Vulkan compute, real-time NeRF inference, and nuclear/quantum physics visualization, free to use, modify, and build on for any scientific or creative purpose. Built by one person, designed to be understood and extended by one person.
+## Highlights
+
+**Reverse-engineered SASS on real hardware** — 9 probe kernels, 2 microbenchmarks, 3,107 instructions disassembled and analyzed on an RTX 4070 Ti Super (SM 8.9). Measured what NVIDIA doesn't document: FFMA latency is 4.54 cycles, MUFU.EX2 is 17.56, LDG pointer-chase is 92. Decoded the 64-bit instruction encoding format by diffing thousands of instruction words.
+
+**Beat the compiler on Instant-NGP** — rewrote the three critical kernels (hash grid encoding, MLP forward, volume rendering) in SASS-level inline PTX. The MLP runs **3.16x** faster. Volume rendering **1.53x**. Hash grid went through three optimization iterations (0.69x regression → 1.03x parity → **1.11x** win) — documented every dead end and fix.
+
+**40K lines of C, zero frameworks** — CPU path tracer with adaptive sampling and deterministic RNG, Vulkan compute with 28 render modes and hybrid mesh+NeRF, RBMK-1000 nuclear reactor thermal simulation with real IAEA material correlations, quantum orbital raymarcher, Blender-style mesh editor. All from scratch.
 
 ---
 
-## What's in here
+## SASS Reverse Engineering
 
-### Path Tracer (CPU)
-- **Tile-based multithreaded renderer** with a persistent pthread pool, 64-byte-aligned `WorkerLocal` structs to eliminate false sharing, and atomic job stealing in 8-tile chunks
-- **Adaptive sampling** using Welford online variance — each pixel independently converges based on luminance standard error (`se ≤ max(abs_err, rel_err × |mean|)`), with configurable batch size and minimum SPP floor. Saves 40-70% of samples on smooth regions
-- **Deterministic per-pixel RNG** — xorshift32 seeded with Fibonacci hashing constants (`0x9E3779B1`) and a Murmur-style finalizer, so renders are reproducible across any thread/tile configuration
-- **Materials:** Lambertian, Metal (configurable fuzz), Dielectric (Snell + Schlick Fresnel + TIR), Emissive (HDR up to 10.0)
-- **Extras:** Beer-Lambert fog with in-scattering, Russian roulette path termination, 4 debug viz modes (albedo, normals, depth, luminance heatmap)
+Built on RTX 4070 Ti Super (Ada Lovelace, SM 8.9). First-party measurements, not copied from docs.
 
-### BVH Acceleration
-- **Arena-allocated BVH** — contiguous DFS-order node pool (`2n+2` capacity), bump-allocated, zero per-node free cost, cache-friendly traversal
-- **Near-first child ordering** with early-out: computes entry `t_min` for both children, visits closer first, skips far child when AABB test against tightened `closest_t` fails
-- **ML policy pruning (experimental):** loads a CSV of `(node_id, prune)` pairs from offline analysis, applies via binary search — pruned subtrees are physically detached, skipping both AABB tests and child visits entirely. Per-node `visit_count`/`useful_count` telemetry dumps for traversal efficiency analysis
+| Instruction | Latency | Throughput (ops/clk/SM) |
+|---|---|---|
+| FFMA (fused multiply-add) | 4.54 cyc | 44.6 |
+| IADD3 (3-input integer add) | 2.51 cyc | 68.2 |
+| MUFU.EX2 (fast exp, SFU) | 17.56 cyc | 9.9 |
+| MUFU.RCP (reciprocal, SFU) | 41.55 cyc | — |
+| LDG (global memory chase) | 92.29 cyc | — |
+| LDS (shared memory chase) | 28.03 cyc | — |
+| SHFL.BFLY (warp shuffle) | 24.96 cyc | — |
 
-### NeRF — Instant Neural Radiance Fields on CPU
-- **Runtime CPUID detection** for AVX2 and AVX-512F with scalar fallback — zero crashes on any x86 CPU
-- **12-level multi-resolution hash grid encoding** with trilinear interpolation across 8 cube corners, software prefetch (`_mm_prefetch`) to hide random-access latency on the hash table
-- **AVX2-vectorized MLP inference** (27→64→64→4) using 256-bit FMA, with a batched 8-ray variant for throughput. Weights stored as fp16 on disk, expanded to fp32 at load via hand-written half-to-float converter
-- **64³ occupancy grid** for empty-space skipping (3× step in unoccupied voxels) and early ray termination at 99% alpha
-- Front-to-back volume compositing with softplus density activation and sigmoid RGB
+**Toolkit:** 9 probe kernels (FP32, integer, MUFU, bitwise, memory, conversions, control flow, special regs, tensor cores) + latency/throughput microbenchmarks with 512-deep dependent chains. Multi-architecture pipeline with parameterized scripts — Pascal (SM 6.1) vs Ada (SM 8.9) comparison ready.
+
+**Encoding analysis:** Reverse-engineered the 64-bit SASS instruction word by diffing same-opcode instructions with different operands. Mapped register fields for FADD, FFMA, IADD3, LOP3, MOV, LDG, STG. Opcode lives in the low 16 bits (e.g. FADD = 0x7221, IADD3 = 0x7210, LDG = 0x7981).
+
+Full results: [`src/sass_re/RESULTS.md`](src/sass_re/RESULTS.md)
+
+## Instant-NGP SASS Kernels
+
+Three kernels rewritten in inline PTX to produce optimal SASS. Every instruction hand-chosen, every register allocation deliberate, verified by disassembly.
+
+| Kernel | Speedup vs nvcc | Key technique |
+|---|---|---|
+| **MLP Forward** (27→64→64→4) | **3.16x** | 8-wide ILP FFMA chains, shared mem weight tiling, FMNMX ReLU, MUFU sigmoid |
+| **Volume Rendering** | **1.53x** | MUFU.EX2 fast exp, predicated early exit, warp SHFL neighbor sharing |
+| **Hash Grid Encoding** | **1.11x** | float2 vectorized LDG.E.64, SW pipelining across levels, LOP3 XOR |
+
+The hash grid has a documented optimization journey: v1 used `asm volatile` everywhere and regressed to 0.69x (volatile barriers killed load/compute interleaving). v2 switched to non-volatile asm + pure C trilinear, reaching parity. v3 added float2 vectorized loads and software pipelining for the win.
+
+**Three-tier docs** — written so anyone can learn from this work:
+- [Explained for Everyone](src/sass_re/instant_ngp/docs/EXPLAINED_FOR_EVERYONE.md) — no CS background needed
+- [Learning Guide](src/sass_re/instant_ngp/docs/LEARNING_GUIDE.md) — teaches you to read SASS from scratch, with real instructions decoded step by step
+- [Technical Reference](src/sass_re/instant_ngp/docs/TECHNICAL_REFERENCE.md) — register counts, SASS diffs, architecture-specific details
+
+---
+
+## The Engine
+
+Everything below is what the SASS work sits on top of — a complete rendering and physics engine in C11.
+
+### Path Tracer
+- Tile-based multithreaded renderer — persistent thread pool, 64-byte-aligned per-thread state, atomic job stealing
+- Adaptive sampling via Welford online variance — each pixel converges independently, saves 40-70% of samples on smooth regions
+- Deterministic per-pixel RNG (xorshift32 + Fibonacci hash + Murmur finalizer) — same image regardless of thread count
+- Materials: Lambertian, Metal (fuzz), Dielectric (Snell + Schlick + TIR), Emissive (HDR)
+- Beer-Lambert fog, Russian roulette, 4 debug viz modes
+
+### BVH
+- Arena-allocated contiguous DFS-order nodes, near-first child traversal with early-out
+- ML policy pruning (experimental) — offline-trained prune decisions applied via binary search, with per-node visit telemetry
+
+### NeRF on CPU
+- AVX2/AVX-512 vectorized MLP inference (27→64→64→4) with runtime CPUID detection and scalar fallback
+- 12-level hash grid encoding with software prefetch, 64³ occupancy grid for empty-space skipping
+- Batched 8-ray variant, fp16 weights on disk with hand-written half-to-float expansion
 
 ### Vulkan GPU Compute
-- **Interactive Vulkan raytracer** — GLFW window with WASD + mouse-look FPS camera, progressive accumulation with temporal reset on movement
-- **GPU LBVH construction** with OBJ loader (fan triangulation), triangle/BVH binary caching keyed on file size + mtime
-- **Hybrid mesh + NeRF rendering** (28 render modes): CPU occupancy-grid depth prepass at ¼ resolution → depth hints SSBO → GPU narrow-band NeRF raymarching. Hash grid + MLP weights uploaded as GPU SSBOs
-- **6 GLSL compute shaders** — raytracer core, quantum wavefunction, quantum raymarch, nuclear density, thermal diffusion, tonemap/denoise
+- Interactive raytracer with WASD + mouse-look camera, progressive accumulation
+- GPU LBVH construction, hybrid mesh + NeRF rendering (28 modes), depth prepass at quarter resolution
+- 6 GLSL compute shaders: raytracer, quantum wavefunction, quantum raymarch, nuclear density, thermal diffusion, tonemap
 
-### Nuclear & Quantum Physics Simulations
-
-**RBMK-1000 Reactor Thermal Simulation** — models Chernobyl Unit 4 at 3200 MWt:
-- 1661 fuel channels on 25 cm graphite lattice, 7 MPa boiling-water coolant, 64³–128³ grid
-- Temperature-dependent properties for 6 materials (UO₂, Zircaloy-4, H₂O, graphite, B₄C, void) using IAEA thermal conductivity correlations and Fink 2000 specific heat
-- 3D heat diffusion via explicit Euler with 6-neighbor Laplacian (CFL-limited) + GPU Jacobi solver path
-- 1D coolant flow: enthalpy-based subcooled→boiling→superheated transitions, Zuber-Findlay drift-flux void fraction
-- Baker-Just Zircaloy oxidation: `Zr + 2H₂O → ZrO₂ + 2H₂ + 6.5 MJ/kg`, positive void coefficient reactivity feedback (~2β)
-
-**Quantum Volume Raymarcher** — hydrogen-like orbital visualization:
-- Two-pass Vulkan compute: Pass 1 evaluates Σ|ψᵢ|² on a 3D SSBO grid, Pass 2 volume-raymarches with up to 1024 steps → RGBA32F output
-- Full (n, l, m) quantum numbers with Aufbau-order electron filling for multi-electron atoms up to Z≈30, Slater's rules for Z_eff
-- Signed wavefunction grid for phase coloring, Reinhard tone-mapping + log-compressed opacity, 7 color modes
+### Nuclear & Quantum Physics
+- **RBMK-1000 reactor sim** — Chernobyl Unit 4 at 3200 MWt, 1661 fuel channels, 6 materials with IAEA correlations, 3D heat diffusion + 1D coolant flow with boiling transitions, Zircaloy oxidation with positive void coefficient feedback
+- **Quantum orbital raymarcher** — two-pass Vulkan compute for hydrogen-like atoms up to Z≈30, Aufbau electron filling, Slater Z_eff, signed wavefunction phase coloring
 
 ### Mesh Editor
-- **Single-file immediate-mode 3D editor** built on raylib — Blender-style controls: Edit/Viewport mode toggle, orbit cam (Alt+LMB), mouse-wheel zoom
-- **7 transform tools:** Grab (G), Rotate (R), Scale (S) with axis constraint (X/Y/Z), Extrude (F), Inset (I), Face Bevel (B) — all with live mouse preview and Escape cancel
-- Vertex/Edge/Face selection with Möller-Trumbore ray picking, half-edge topology, OBJ import/export
-- Primitive generators: Cube, UV Sphere (20×20), Cylinder (20-seg)
+- Single-file immediate-mode 3D editor on raylib — Grab, Rotate, Scale, Extrude, Inset, Bevel with axis constraints
+- Vertex/Edge/Face selection via Moller-Trumbore ray picking, OBJ import/export
 
 ### Denoiser
-- **Separable bilateral filter** (horizontal + vertical pass) with cache-optimized 64-column vertical strips to fit in L2
-- Rec.709 luminance-based range kernel for perceptually-weighted edge preservation
-- ONNX runtime and GPU shader paths available for ML-based denoising
-
-### SASS Reverse Engineering Toolkit
-
-A complete suite for reverse-engineering NVIDIA GPU shader assembly (SASS) on real hardware. Built on the RTX 4070 Ti Super (Ada Lovelace, SM 8.9).
-
-- **9 probe kernels** isolating every major instruction class: FP32 arith, integer arith, MUFU (transcendentals), bitwise/shift, memory (LDG/STG/LDS/atomics), conversions, control flow, special registers, tensor cores
-- **2 microbenchmarks** measuring dependent-chain latency (512-deep) and throughput (ops/clock/SM) — first-party numbers, not from docs
-- **Encoding analysis** diffing instruction words to reverse-engineer the 64-bit SASS encoding format — opcode field in low 16 bits, register fields mapped for FADD/FFMA/IADD3/LOP3/MOV/LDG/STG
-- **Multi-architecture pipeline** with parameterized scripts for any SM target. Side-by-side Pascal (SM 6.1) vs Ada (SM 8.9) comparison ready
-- **3,107 SASS instructions analyzed** across all probes
-
-**Key measurements:**
-
-| Instruction | Latency | Throughput |
-|---|---|---|
-| FFMA | 4.54 cyc | 44.6 ops/clk/SM |
-| IADD3 | 2.51 cyc | 68.2 ops/clk/SM |
-| MUFU.EX2 | 17.56 cyc | 9.9 ops/clk/SM |
-| LDG chase | 92.29 cyc | — |
-| LDS chase | 28.03 cyc | — |
-
-### Instant-NGP SASS Kernels
-
-Hand-written inline PTX implementations of the three hot loops in NVIDIA's Instant Neural Graphics Primitives, targeting optimal SASS output on SM 8.9:
-
-- **Hash Grid Encoding** — float2 vectorized loads (LDG.E.64), software pipelining across resolution levels, LOP3.LUT 0x96 for single-instruction 3-input XOR. Optimized from 0.69x → 1.11x over nvcc baseline across three iterations
-- **Tiny MLP Forward** (27→64→64→4) — 8-wide ILP FFMA chains, shared memory weight tiling, FMNMX predicated ReLU, MUFU.EX2 sigmoid. **3.16x** speedup
-- **Volume Rendering** — MUFU.EX2 fast exp, predicated early ray termination, warp-level SHFL for neighbor sharing. **1.53x** speedup
-- **Three-tier documentation:** [for everyone](src/sass_re/instant_ngp/docs/EXPLAINED_FOR_EVERYONE.md) · [learning guide](src/sass_re/instant_ngp/docs/LEARNING_GUIDE.md) · [technical reference](src/sass_re/instant_ngp/docs/TECHNICAL_REFERENCE.md)
+- Separable bilateral filter with cache-optimized vertical strips, Rec.709 luminance range kernel
+- ONNX runtime and GPU shader paths for ML denoising
 
 ---
 
@@ -97,43 +98,39 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build .
 ```
 
-CMake auto-detects Vulkan, raylib, OpenMP, AVX2. Missing deps just skip those targets — the core CPU raytracer has zero external dependencies beyond pthreads.
+CMake auto-detects Vulkan, raylib, OpenMP, AVX2. Missing deps skip those targets — the core path tracer needs only pthreads.
 
 ## Run
 
 ```bash
-# Quick render (low samples)
-YSU_W=320 YSU_H=180 YSU_SPP=4 YSU_THREADS=0 ./build/bin/ysu
+# Quick render
+YSU_W=320 YSU_H=180 YSU_SPP=4 ./build/bin/ysu
 
-# Full quality with adaptive sampling + denoising
+# Full quality
 YSU_W=1920 YSU_H=1080 YSU_SPP=128 YSU_ADAPTIVE=1 YSU_NEURAL_DENOISE=1 ./build/bin/ysu
 ```
 
-On Windows (PowerShell):
+Windows:
 ```powershell
 $env:YSU_W=1920; $env:YSU_H=1080; $env:YSU_SPP=128; .\build\bin\ysu.exe
 ```
 
 ## Configuration
 
-Everything is controlled via environment variables — no config files, no CLI arg parsing:
+Environment variables only — no config files, no arg parsing:
 
 | Variable | Default | Description |
 |---|---|---|
-| `YSU_W` | 800 | Image width |
-| `YSU_H` | 600 | Image height |
+| `YSU_W` / `YSU_H` | 800 / 600 | Image dimensions |
 | `YSU_SPP` | 64 | Samples per pixel |
 | `YSU_DEPTH` | 10 | Max bounce depth |
 | `YSU_THREADS` | auto | Thread count (0 = all cores) |
 | `YSU_TILE` | 32 | Tile size for MT renderer |
 | `YSU_ADAPTIVE` | 0 | Adaptive sampling (Welford variance) |
-| `YSU_SPP_MIN` | 16 | Minimum SPP before adaptive can early-stop |
-| `YSU_SPP_BATCH` | 4 | Samples per adaptive batch |
-| `YSU_REL_ERR` | 0.01 | Relative error threshold for convergence |
-| `YSU_ABS_ERR` | 0.005 | Absolute error threshold for convergence |
+| `YSU_SPP_MIN` | 16 | Min SPP before adaptive early-stop |
+| `YSU_REL_ERR` / `YSU_ABS_ERR` | 0.01 / 0.005 | Convergence thresholds |
 | `YSU_NEURAL_DENOISE` | 0 | Enable denoiser |
-| `YSU_FOG` | 0 | Enable Beer-Lambert fog |
-| `YSU_DUMP_RGB` | 0 | Dump raw RGB buffer before postprocess |
+| `YSU_FOG` | 0 | Beer-Lambert fog |
 
 ## Project Structure
 
@@ -146,29 +143,24 @@ src/
   vulkan/      — Vulkan compute pipelines, LBVH, GPU BVH, OBJ loader
   physics/     — quantum volume, nuclear fission/fusion, reactor thermal
   editor/      — mesh editor, viewport, edit mode (requires raylib)
-  upscale/     — neural upscaling pipeline
   sass_re/     — SASS reverse engineering: probes, microbench, instant-NGP kernels
-  tools/       — CLI utilities (inspect_ppm, ysub_info, ysub_to_ppm)
+  tools/       — CLI utilities
   third_party/ — stb_image_write.h
 shaders/       — GLSL compute shaders + compiled .spv
-docs/
-  sass/        — SASS & GPU ISA references
-  nerf/        — NeRF architecture, SIMD, depth conditioning
-  engine/      — renderer, BVH, denoiser, physics, editor design notes
-  results/     — benchmarks, test summaries, deployment reports
+docs/          — organized into sass/, nerf/, engine/, results/
 scripts/       — build, test, and analysis scripts
-models/        — pretrained NeRF model binaries
 ```
 
 ## Requirements
 
-- **Required:** C11 compiler (GCC / Clang / MSVC), pthreads, CMake 3.16+
-- **Optional:** Vulkan SDK (GPU raytracer + physics viz), raylib (mesh editor), OpenMP (NeRF batch), ONNX Runtime (ML denoiser)
+- **Required:** C11 compiler, pthreads, CMake 3.16+
+- **Optional:** Vulkan SDK, raylib (editor), OpenMP, ONNX Runtime
+- **SASS toolkit:** CUDA 13.x (SM 7.5+) or CUDA 12.x (Pascal), MSVC or GCC, Python 3
 
 ## License
 
-MIT License
+MIT
 
 ## Author
 
-Umut Korkmaz — 16-year-old solo developer. :)
+Umut Korkmaz — solo developer, 16 years old
