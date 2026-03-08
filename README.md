@@ -58,6 +58,35 @@ YSU (Your Simulated Universe) is an MIT-licensed, from-scratch rendering and phy
 - Rec.709 luminance-based range kernel for perceptually-weighted edge preservation
 - ONNX runtime and GPU shader paths available for ML-based denoising
 
+### SASS Reverse Engineering Toolkit
+
+A complete suite for reverse-engineering NVIDIA GPU shader assembly (SASS) on real hardware. Built on the RTX 4070 Ti Super (Ada Lovelace, SM 8.9).
+
+- **9 probe kernels** isolating every major instruction class: FP32 arith, integer arith, MUFU (transcendentals), bitwise/shift, memory (LDG/STG/LDS/atomics), conversions, control flow, special registers, tensor cores
+- **2 microbenchmarks** measuring dependent-chain latency (512-deep) and throughput (ops/clock/SM) — first-party numbers, not from docs
+- **Encoding analysis** diffing instruction words to reverse-engineer the 64-bit SASS encoding format — opcode field in low 16 bits, register fields mapped for FADD/FFMA/IADD3/LOP3/MOV/LDG/STG
+- **Multi-architecture pipeline** with parameterized scripts for any SM target. Side-by-side Pascal (SM 6.1) vs Ada (SM 8.9) comparison ready
+- **3,107 SASS instructions analyzed** across all probes
+
+**Key measurements:**
+
+| Instruction | Latency | Throughput |
+|---|---|---|
+| FFMA | 4.54 cyc | 44.6 ops/clk/SM |
+| IADD3 | 2.51 cyc | 68.2 ops/clk/SM |
+| MUFU.EX2 | 17.56 cyc | 9.9 ops/clk/SM |
+| LDG chase | 92.29 cyc | — |
+| LDS chase | 28.03 cyc | — |
+
+### Instant-NGP SASS Kernels
+
+Hand-written inline PTX implementations of the three hot loops in NVIDIA's Instant Neural Graphics Primitives, targeting optimal SASS output on SM 8.9:
+
+- **Hash Grid Encoding** — float2 vectorized loads (LDG.E.64), software pipelining across resolution levels, LOP3.LUT 0x96 for single-instruction 3-input XOR. Optimized from 0.69x → 1.11x over nvcc baseline across three iterations
+- **Tiny MLP Forward** (27→64→64→4) — 8-wide ILP FFMA chains, shared memory weight tiling, FMNMX predicated ReLU, MUFU.EX2 sigmoid. **3.16x** speedup
+- **Volume Rendering** — MUFU.EX2 fast exp, predicated early ray termination, warp-level SHFL for neighbor sharing. **1.53x** speedup
+- **Three-tier documentation:** [for everyone](src/sass_re/instant_ngp/docs/EXPLAINED_FOR_EVERYONE.md) · [learning guide](src/sass_re/instant_ngp/docs/LEARNING_GUIDE.md) · [technical reference](src/sass_re/instant_ngp/docs/TECHNICAL_REFERENCE.md)
+
 ---
 
 ## Build
@@ -118,10 +147,15 @@ src/
   physics/     — quantum volume, nuclear fission/fusion, reactor thermal
   editor/      — mesh editor, viewport, edit mode (requires raylib)
   upscale/     — neural upscaling pipeline
+  sass_re/     — SASS reverse engineering: probes, microbench, instant-NGP kernels
   tools/       — CLI utilities (inspect_ppm, ysub_info, ysub_to_ppm)
   third_party/ — stb_image_write.h
 shaders/       — GLSL compute shaders + compiled .spv
-docs/          — documentation & design notes
+docs/
+  sass/        — SASS & GPU ISA references
+  nerf/        — NeRF architecture, SIMD, depth conditioning
+  engine/      — renderer, BVH, denoiser, physics, editor design notes
+  results/     — benchmarks, test summaries, deployment reports
 scripts/       — build, test, and analysis scripts
 models/        — pretrained NeRF model binaries
 ```
