@@ -40,6 +40,54 @@ That might sound small, but here's why it matters:
 
 ---
 
+### The Hash Grid Optimization Journey: From Failure to Success
+
+This is the part of the project that taught us the most — because **our first version was actually slower than the compiler's version**.
+
+#### Version 1: Slower than the compiler (0.69x — a 31% speed LOSS)
+
+We wrote every single instruction by hand. Every add, every multiply, every memory load — we told the GPU exactly what to do, in what order. We were sure it would be faster.
+
+It was **31% slower**.
+
+Why? Imagine you're a chef following a recipe. You need to boil water, chop vegetables, and preheat the oven. A smart chef starts the water boiling, turns on the oven, and *then* chops vegetables — multitasking!
+
+But we essentially told the chef: "You MUST do each step in EXACTLY this order. Do NOT move on until each step is completely done." Boil the water... stand there... wait... wait... OK now turn on the oven... stand there... wait... wait...
+
+The technical term is `asm volatile` — a keyword that means "execute this instruction right here, right now, no reordering allowed." We put it on every single instruction. The compiler (the smart program that normally translates code) couldn't rearrange anything. It couldn't start loading the next piece of data while still processing the current one.
+
+The compiler's own version, despite being "dumber" in theory, was free to rearrange. It would start loading 10 pieces of data simultaneously, do math while waiting, and use everything as it arrived. Our version loaded one piece, waited 200 clock cycles (literally just sitting idle), loaded the next, waited again...
+
+**Lesson learned**: Being too controlling is worse than letting a smart system do its thing.
+
+#### Version 2: Back to even (1.03x)
+
+We removed the `volatile` keyword from most instructions. Now the compiler was free to rearrange our code again — but we kept the *important* custom instructions (like `LOP3`, the 3-way XOR that the compiler can't generate on its own).
+
+We also switched the trilinear interpolation (the "blend the 8 corners" math) from hand-written assembly to plain C code, letting the compiler optimize that part.
+
+Result: 1.03x — essentially tied with the compiler. We'd un-broken ourselves.
+
+#### Version 3: Finally beating the compiler (1.11x)
+
+Two tricks pushed us ahead:
+
+1. **Loading two files at once instead of one** — Remember the filing cabinet analogy? Instead of loading one float (4 bytes) per trip, we load a `float2` (8 bytes). Same trip to the cabinet, double the information. One instruction instead of two. That's 96 loads instead of 192.
+
+2. **Starting the next batch while still processing the current one** — We process two zoom levels at a time. While we're doing the math for Level 0, we've already started loading data for Level 1. By the time we need Level 1's data, it's already arrived. The compiler does this a little, but we structure the code so it happens *aggressively*.
+
+#### The Scoreboard
+
+| Version | Speed vs Compiler | What Changed |
+|---------|-------------------|--------------|
+| **v1** | **0.69x** (31% loss!) | Every instruction hand-written with `asm volatile` — killed reordering |
+| **v2** | **1.03x** (tied) | Removed volatile, used C trilinear, kept LOP3 |
+| **v3** | **1.11x** (11% win) | float2 vectorized loads + software pipelining |
+
+The biggest takeaway: **optimization is not about controlling everything — it's about controlling the right things and letting smart tools handle the rest.**
+
+---
+
 ### Stage 2: "What Color Is This?" — The Neural Network (MLP)
 
 **Analogy**: After Stage 1 gives you information about your location, Stage 2 is like an artist who takes that information and decides "this spot should be bright red" or "this spot should be dark blue."
