@@ -27,6 +27,8 @@
 | IMAD throughput | 64 ops/clk/SM |
 | LOP3 throughput | 64 ops/clk/SM |
 | MUFU throughput | 16 ops/clk/SM (special function) |
+| MUFU.EX2 latency | ~18 cycles (measured; value-dependent) |
+| MUFU.RCP latency | ~42 cycles (measured; value-dependent) |
 | LDG L1 hit latency | ~33 cycles |
 | LDG L2 hit latency | ~200 cycles |
 | LDS latency | ~23 cycles |
@@ -396,7 +398,7 @@ mul.f32         neg_xl2e, sigma_dt, 0fBFB8AA3B   // -(sigma*dt) * log2(e)
 ex2.approx.f32  neg_exp, neg_xl2e                // 2^(neg_xl2e)
 ```
 
-2 instructions, ~8 cycles. Standard `expf()` is 20+ instructions.
+2 instructions, ~20 cycles. Standard `expf()` is 20+ instructions.
 
 #### 2. Algebraic Simplification
 

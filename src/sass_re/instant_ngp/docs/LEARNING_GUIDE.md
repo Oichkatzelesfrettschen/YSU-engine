@@ -294,6 +294,8 @@ The MUFU unit is a dedicated piece of silicon on the GPU that computes transcend
 
 We use this to compute `exp(-x)` by rewriting it as `2^(-x × log2(e))`. One multiply + one MUFU.EX2 = 2 instructions. The standard `expf()` function needs ~20+ instructions because it does a polynomial approximation in software.
 
+> **Note on MUFU latency**: Our microbenchmarks measured MUFU.EX2 at **17.56 cycles** on the RTX 4070 Ti Super (dependent-chain measurement). That's slower than a simple FFMA (~4.5 cycles), but you're replacing 20-30 instructions with 1 — the total wall-clock time is still massively lower. Other MUFU operations are even slower: RCP at ~42 cycles, SIN at ~24 cycles. These latencies are value-dependent and vary by operation.
+
 ### Predicates — conditional execution without branching
 
 ```
@@ -327,7 +329,7 @@ This is our **early exit**: "If transmittance < 0.001, skip to the end." Predica
 | **STG** | Store to global memory | ~200 cycles | Writing results |
 | **LOP3** | 3-input logic operation (AND, OR, XOR — any combo) | ~4 cycles | Hash function XOR |
 | **IMAD** | Integer multiply-add: `d = a*b + c` | ~4 cycles | Address calculation, hashing |
-| **MUFU.EX2** | Hardware 2^x approximation (special function unit) | ~6 cycles | Fast exp(), sigmoid |
+| **MUFU.EX2** | Hardware 2^x approximation (special function unit) | ~18 cycles | Fast exp(), sigmoid |
 | **FMNMX** | Float min/max | ~4 cycles | ReLU activation |
 | **FSETP** | Float compare → set predicate flag | ~4 cycles | Early exit test |
 | **IADD3** | 3-input integer add | ~4 cycles | Address arithmetic |
@@ -758,7 +760,7 @@ FMUL    neg_xl2e, x, -1.4427    // multiply by -log2(e)
 MUFU.EX2 result, neg_xl2e       // hardware 2^x (built-in approximation)
 ```
 
-Two instructions, ~8 cycles. The standard library `expf()` compiles to ~20+ instructions.
+Two instructions, ~20 cycles. The standard library `expf()` compiles to ~20+ instructions.
 
 **2. Reusing the exponential result**
 
