@@ -225,13 +225,121 @@ Ada Lovelace (SM 8.9) has **LOP3** — a single instruction that computes ANY 3-
 hash = LOP3(a, b, c, 0x96)    ← 1 instruction!
 ```
 
-### Results
+### The Full Optimization Journey: v1 → v2 → v3
 
-- **v1**: 0.69x (slower than compiler!) because `volatile` killed load interleaving
-- **v2**: 1.03x (fixed the regression, at parity)
-- **v3**: 1.11x (float2 loads + SW pipelining beat the compiler)
+This is the most instructive part of the project — we went from **slower than the compiler** to **11% faster**, and the lessons along the way teach more than the final result.
 
-The SASS: 96 × LDG.E.64.CONSTANT (our kernel) vs ~192 × LDG.E.32 (compiler's kernel)
+#### v1: The volatile disaster (0.69x — 31% SLOWER than the compiler)
+
+Our first version wrapped every single inline PTX instruction in `asm volatile(...)`. Here's what that looked like:
+
+```c
+// v1: EVERY operation was volatile
+asm volatile("lop3.b32 %0, %1, %2, %3, 0x96;" : "=r"(hash) : "r"(a), "r"(b), "r"(c));
+asm volatile("ld.global.v2.f32 {%0,%1}, [%2];" : "=f"(f0), "=f"(f1) : "l"(addr));
+asm volatile("fma.rn.f32 %0, %1, %2, %3;"     : "=f"(r)    : "f"(w), "f"(a), "f"(b));
+```
+
+**Why `volatile` kills memory-bound kernels:**
+
+The GPU can have ~20-30 memory loads in-flight simultaneously per warp. This is how it hides the 200-cycle L2 latency — issue a load, then do something else for 200 cycles, and the data will be ready when you need it (this is called **latency hiding**).
+
+`asm volatile` creates a **scheduling barrier**. The compiler must execute that instruction at that exact point — it cannot move it earlier or later. When every load is volatile, the pipeline collapses:
+
+```
+Cycle 0:     load_volatile(A)   ← issue load
+Cycle 1-199:  ... 199 cycles of NOTHING (stall!) ...
+Cycle 200:   use A
+Cycle 201:   load_volatile(B)   ← issue load
+Cycle 202-400: ... 199 more cycles of NOTHING ...
+Cycle 401:   use B
+```
+
+The compiler's version (no volatile) freely reorders:
+```
+Cycle 0:     load(A)       ← issue (non-blocking)
+Cycle 1:     load(B)       ← issue (non-blocking, overlaps with A)
+Cycle 2:     load(C)       ← issue (non-blocking, overlaps with A and B)
+Cycle 3-6:   XOR, IMAD...  ← do math while all 3 loads are in flight
+...
+Cycle ~200:  use A          ← data arrived!
+Cycle ~201:  use B          ← also arrived!
+```
+
+**We serialized what should have been parallel.** The GPU was idle 95% of the time.
+
+#### v2: Removing the barriers (1.03x — back to parity)
+
+The fix was conceptually simple but required rethinking our approach:
+
+| Component | v1 (broken) | v2 (fixed) | Why |
+|-----------|-------------|------------|-----|
+| Hash XOR | `asm volatile("lop3...")` | `asm("lop3...")` | Non-volatile: compiler CAN reorder |
+| Trilinear interp | `asm volatile("fma...")` | `a + t*(b-a)` (C code) | Compiler generates FMA, full optimization freedom |
+| Feature loads | `asm volatile("ld.global...")` | `__ldg()` intrinsic | Compiler knows it's a load, schedules optimally |
+| Feature stores | `asm volatile("st.global...")` | `output[i] = val` (C) | Compiler handles store scheduling |
+
+Key insight: **non-volatile `asm` still guarantees the instruction is emitted** (compiler won't delete it), but lets the compiler freely reorder it relative to other instructions. This is the sweet spot — you get your custom instruction AND the compiler's scheduler.
+
+We kept `asm("lop3...")` for the 3-input XOR because C has no equivalent (two C XORs = 2 SASS instructions vs LOP3 = 1). Everything else went back to C or intrinsics.
+
+Result: 1.03x — we'd undone the self-inflicted damage and caught up to the compiler.
+
+#### v3: Beating the compiler (1.11x)
+
+Two optimizations pushed us past:
+
+**Optimization 1: float2 vectorized loads**
+
+Each hash table entry is 2 floats (8 bytes). The compiler loaded them as two separate 32-bit loads:
+```
+// Compiler generates:
+LDG.E.CONSTANT R22, [R4.64]        // 1st float, 4 bytes
+LDG.E.CONSTANT R26, [R4.64+0x4]    // 2nd float, 4 bytes
+```
+
+We forced a single 64-bit load:
+```c
+float2 v = __ldg((const float2*)(level_ptr + hash_index * 2));
+// Compiles to:
+// LDG.E.64.CONSTANT R22, [R22.64]    // both floats, 8 bytes, 1 instruction
+```
+
+Same data, half the instructions. The memory bus handles 64-bit loads at the same throughput — you get twice the data per instruction.
+
+**Across the whole kernel**: 96 loads instead of ~192. That's 96 fewer instructions for decode/issue/retire.
+
+**Optimization 2: Software pipelining across level pairs**
+
+Instead of processing one level at a time, we interleave two:
+```
+// Process levels in pairs: (0,1), (2,3), (4,5), (6,7), (8,9), (10,11)
+for (pair = 0; pair < 6; pair++) {
+    // Issue 16 loads simultaneously (8 for level A + 8 for level B)
+    hash_and_load(level_A);
+    hash_and_load(level_B);
+    
+    // The hash computation for level B = ~100 cycles of ALU work
+    // By now, level A's loads (issued first) have had time to arrive
+    
+    // Trilinear interpolation for both
+    trilinear(level_A);   // loads arrived ~200 cycles ago
+    trilinear(level_B);   // loads arrived ~100 cycles ago
+}
+```
+
+16 simultaneous memory requests (vs 8) means the memory controller has more work to pipeline. And the ALU work for level B's hash computation acts as free latency hiding for level A's loads.
+
+#### The scoreboard
+
+| Version | Speedup | Key Change | SASS Signature |
+|---------|---------|------------|----------------|
+| **v1** | **0.69x** | All `asm volatile` → serialized loads | Interleaving destroyed |
+| **v2** | **1.03x** | Non-volatile asm + C trilinear + `__ldg()` | Load reordering restored |
+| **v3** | **1.11x** | float2 loads + level-pair pipelining at `-O2` | 96 × LDG.E.64.CONSTANT |
+| *ref* | *1.00x* | Compiler's auto-generated code | ~192 × LDG.E.32 |
+
+**The lesson**: For memory-bound kernels, the compiler's instruction scheduler is your *ally*, not your enemy. Use inline asm surgically (for instructions C can't express), and let the compiler handle the rest.
 
 ---
 

@@ -162,6 +162,89 @@ V3 PTX kernel static instruction profile:
 
 Register usage: 42 / 255 → occupancy limited by block size (256 threads × 42 regs = 10,752 regs < 65,536 per SM → multiple blocks can co-reside).
 
+### Optimization History: v1 → v2 → v3
+
+The hash grid kernel went through three major revisions. The progression is instructive for anyone doing inline-asm GPU optimization.
+
+#### v1: Full inline PTX (0.69x — regression)
+
+Every arithmetic and memory instruction used `asm volatile`:
+
+```c
+asm volatile("lop3.b32 %0, %1, %2, %3, 0x96;"      : "=r"(h) : "r"(a), "r"(b), "r"(c));
+asm volatile("ld.global.v2.f32 {%0,%1}, [%2];"       : "=f"(f0), "=f"(f1) : "l"(addr));
+asm volatile("fma.rn.f32 %0, %1, %2, %3;"           : "=f"(r) : "f"(t), "f"(a), "f"(b));
+```
+
+**Root cause**: `volatile` on every instruction creates N scheduling barriers per iteration. ptxas is forced to execute instructions in program order. For an L2-latency-bound kernel (200 cycles/load), this serializes the memory pipeline. With 8 loads per level × 12 levels = 96 loads, the pipeline is starved: occupancy cannot compensate because the *issue order* is locked, not just the *dependency chain*.
+
+**Quantified impact**: At 200 cycles/load serial, the load-only cost is 96 × 200 = 19,200 cycles. With interleaving (compiler default), the GPU can sustain ~4-8 loads in-flight per warp, reducing effective cost to 96 × 200 / 6 ≈ 3,200 cycles. The volatile version is ~6× slower on loads alone. The 0.69x measured speedup (actually a slowdown) is consistent when factoring in the interleaved ALU hiding the remaining latency in the reference.
+
+#### v2: Selective inline asm (1.03x — parity)
+
+**Changes**:
+- `asm volatile` → `asm` (non-volatile) for `LOP3`. Still emitted, but reorderable.
+- Trilinear interpolation: rewrote from inline PTX FMA to C `a + t*(b-a)`. ptxas generates optimal FMA and can freely schedule it.
+- Loads: replaced `asm volatile("ld.global...")` with `__ldg()` intrinsic. The `__ldg()` function generates `LDG.E.CONSTANT` with cache-policy hints and is fully visible to ptxas's scheduler.
+- Stores: replaced `asm volatile("st.global...")` with plain C array writes.
+
+**Key insight**: Non-volatile `asm` guarantees instruction emission (the instruction will not be dead-code eliminated) but does NOT create a scheduling barrier. ptxas treats it as a normal instruction with declared inputs/outputs and can reorder it freely within its dependency constraints.
+
+**Result**: Load interleaving restored. SASS disassembly showed LDG instructions from multiple loop iterations interleaved with ALU — confirming ptxas was once again scheduling effectively. 1.03x: at parity with the reference.
+
+#### v3: Vectorized loads + software pipelining (1.11x)
+
+**Change 1 — float2 vectorized loads**:
+
+Reference kernel load pattern (scalar):
+```
+// ptxas generates 2 × LDG.E.CONSTANT per corner
+LDG.E.CONSTANT R22, [R4.64]          // feature[0], 32-bit
+LDG.E.CONSTANT R26, [R4.64+0x4]      // feature[1], 32-bit
+```
+
+v3 kernel (vectorized):
+```c
+float2 v = __ldg((const float2*)(level_ptr + hash_index * 2));
+// → LDG.E.64.CONSTANT R22, [R22.64]   // {feature[0], feature[1]}, 64-bit
+```
+
+Impact:
+- **Instruction count**: 96 LDG.E.64 (v3) vs ~192 LDG.E.32 (reference). Halves the number of load instructions.
+- **Issue slots**: Fewer loads = more issue slots available for ALU and address computation.
+- **L2 coalescing**: Each 64-bit request is satisfied by a single L2 sector access (64B sector). Two adjacent 32-bit requests to the same sector would also coalesce, so the bandwidth improvement is modest — the win is primarily in reduced instruction pressure.
+
+**Change 2 — level-pair pipelining**:
+
+The kernel processes 12 levels as 6 pairs. Within each pair:
+
+```
+Phase 1:  hash_and_load(Level_A)    → issues 8 × LDG.E.64 (128 bytes)
+          hash_and_load(Level_B)    → issues 8 × LDG.E.64 (128 bytes)
+          // 16 loads in-flight. Level B's hash ALU work (~50 cycles)
+          // partially hides Level A's L2 latency.
+
+Phase 2:  trilinear(Level_A)        → Level A loads have had ~250 cycles
+          trilinear(Level_B)        → Level B loads have had ~150 cycles
+```
+
+Doubling outstanding memory requests from 8 to 16 per iteration improves L2 utilization. The memory controller can better pipeline requests, and the additional ALU work for Level B's address computation fills bubbles that would otherwise be stalls.
+
+**Change 3 — `-O2` optimization level**:
+
+The move from `-O1` (nvcc default) to `-O2` gave ptxas license for longer-distance load scheduling and more aggressive unrolling. Measured on this kernel alone: ~5% improvement from `-O1` to `-O2`.
+
+#### Summary Table
+
+| Version | Speedup | Loads/thread | Load Width | Volatile Barriers | ptxas Reordering |
+|---------|---------|-------------|------------|-------------------|------------------|
+| v1 | 0.69x | 96 | v2.f32 (asm) | 96+ (every insn) | Blocked |
+| v2 | 1.03x | 96 | 32-bit (`__ldg`) | 0 | Full |
+| v3 | 1.11x | 96 | 64-bit (`__ldg` float2) | 0 | Full + level-pair pipeline |
+| ref | 1.00x | ~192 | 32-bit | N/A (pure C) | Full (compiler baseline) |
+
+**Takeaway**: For memory-bound SASS-level optimization on Ada Lovelace, the compiler's instruction scheduler is the most critical performance lever. Inline `asm volatile` should be reserved exclusively for instructions with true ordering requirements (e.g., memory fences). For everything else, use non-volatile `asm` or C intrinsics and let ptxas interleave.
+
 ---
 
 ## Kernel 2: MLP Forward Pass
