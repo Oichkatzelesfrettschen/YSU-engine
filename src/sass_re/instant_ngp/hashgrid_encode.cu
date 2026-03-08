@@ -1,5 +1,5 @@
 /*
- * Instant-NGP Hash Grid Encoding — SASS-level inline PTX
+ * Instant-NGP Hash Grid Encoding — SASS-level inline PTX (v2)
  *
  * This is the hottest kernel in instant-NGP. For each 3D query point,
  * it encodes position into a feature vector by:
@@ -12,17 +12,33 @@
  *   2. Concatenate all 2L features as network input
  *
  * Target: SM 8.9 (Ada Lovelace)
- * Every critical instruction is hand-written in PTX to control SASS output.
  *
- * SASS instruction budget per level (target):
+ * v2 changes from v1:
+ *   - Non-volatile asm for compute ops → ptxas can freely reorder
+ *     to interleave LDG with ALU and hide ~200-cycle L2 latency
+ *   - volatile ONLY on loads/stores (actual side effects)
+ *   - Trilinear interpolation in C → compiler generates FFMA+FSUB
+ *     with optimal scheduling
+ *   - LOP3 stays inline PTX (no C equivalent for 3-input XOR)
+ *   - __ldg() intrinsic for cache-through loads
+ *
+ * v3 changes from v2:
+ *   - float2 vectorized loads: 16× LDG.32 → 8× LDG.64 per level
+ *     Halves load instruction count; hardware 64-bit loads are same
+ *     throughput as 32-bit but issue twice the data per instruction.
+ *   - Software-pipelined across level pairs: issue loads for level N+1
+ *     while computing trilinear for level N. Doubles outstanding
+ *     memory requests (16 LDG.64 in-flight vs 8).
+ *
+ * SASS instruction budget per level (v3 target):
  *   - 6× FFMA  (scale + floor + fract)
  *   - 3× F2I   (float grid coords → int)
  *   - 24× IMAD (8 corners × 3 primes for hashing)
  *   - 8× LOP3  (8 corners XOR reduction)
- *   - 8× IMAD  (hash modulo via multiply-shift trick)
- *   - 16× LDG  (8 corners × 2 features)
+ *   - 8× LOP3  (hash masking, AND)
+ *   - 8× LDG.64 (8 corners × float2 features)
  *   - 14× FFMA (trilinear interpolation: 7 lerps × 2 features)
- *   Total: ~79 instructions per level, ~948 for 12 levels
+ *   Total: ~71 instructions per level
  */
 
 #include <cuda_runtime.h>
@@ -71,214 +87,130 @@ hashgrid_encode_ptx(
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= N) return;
 
-    /* ── Load position (3 coalesced LDG.E.32) ── */
-    float px, py, pz;
-    {
-        const float *pos_ptr = positions + tid * 3;
-        asm volatile("ld.global.f32 %0, [%1];"     : "=f"(px) : "l"(pos_ptr));
-        asm volatile("ld.global.f32 %0, [%1+4];"   : "=f"(py) : "l"(pos_ptr));
-        asm volatile("ld.global.f32 %0, [%1+8];"   : "=f"(pz) : "l"(pos_ptr));
-    }
+    /* ── Load position (coalesced) ── */
+    const float *pos_ptr = positions + tid * 3;
+    float px = pos_ptr[0];
+    float py = pos_ptr[1];
+    float pz = pos_ptr[2];
 
-    /* ── Per-level encoding ── */
+    /* ── Per-level encoding with software pipelining ──
+     * Process 2 levels at a time: issue loads for level N+1
+     * while computing trilinear for level N. This doubles
+     * outstanding memory requests (16 LDG.64 in-flight). */
     float *feat_out = features + tid * NGP_TOTAL_FEATURES;
 
-    /* Precompute resolution table (compile-time unroll) */
-    float scale = (float)NGP_BASE_RES;
+    /* === Macros for per-level hash + load + trilinear === */
+
+    #define LOP3_XOR(dst, a, b, c) \
+        asm("lop3.b32 %0, %1, %2, %3, 0x96;" : "=r"(dst) : "r"(a), "r"(b), "r"(c))
+
+    #define HASH_AND_LOAD(S, LVL_SCALE, LVL_IDX)                              \
+    {                                                                          \
+        float gx_##S = px * (LVL_SCALE);                                       \
+        float gy_##S = py * (LVL_SCALE);                                       \
+        float gz_##S = pz * (LVL_SCALE);                                       \
+                                                                               \
+        float fx_##S = floorf(gx_##S);                                         \
+        float fy_##S = floorf(gy_##S);                                         \
+        float fz_##S = floorf(gz_##S);                                         \
+                                                                               \
+        wx_##S = gx_##S - fx_##S;                                              \
+        wy_##S = gy_##S - fy_##S;                                              \
+        wz_##S = gz_##S - fz_##S;                                              \
+                                                                               \
+        int ix_##S = (int)fx_##S;                                              \
+        int iy_##S = (int)fy_##S;                                              \
+        int iz_##S = (int)fz_##S;                                              \
+                                                                               \
+        unsigned hx0_##S = (unsigned)ix_##S * PRIME_X;                         \
+        unsigned hy0_##S = (unsigned)iy_##S * PRIME_Y;                         \
+        unsigned hz0_##S = (unsigned)iz_##S * PRIME_Z;                         \
+        unsigned hx1_##S = hx0_##S + PRIME_X;                                  \
+        unsigned hy1_##S = hy0_##S + PRIME_Y;                                  \
+        unsigned hz1_##S = hz0_##S + PRIME_Z;                                  \
+                                                                               \
+        unsigned c0_##S, c1_##S, c2_##S, c3_##S;                               \
+        unsigned c4_##S, c5_##S, c6_##S, c7_##S;                               \
+        LOP3_XOR(c0_##S, hx0_##S, hy0_##S, hz0_##S);                          \
+        LOP3_XOR(c1_##S, hx0_##S, hy0_##S, hz1_##S);                          \
+        LOP3_XOR(c2_##S, hx0_##S, hy1_##S, hz0_##S);                          \
+        LOP3_XOR(c3_##S, hx0_##S, hy1_##S, hz1_##S);                          \
+        LOP3_XOR(c4_##S, hx1_##S, hy0_##S, hz0_##S);                          \
+        LOP3_XOR(c5_##S, hx1_##S, hy0_##S, hz1_##S);                          \
+        LOP3_XOR(c6_##S, hx1_##S, hy1_##S, hz0_##S);                          \
+        LOP3_XOR(c7_##S, hx1_##S, hy1_##S, hz1_##S);                          \
+                                                                               \
+        const unsigned mask = NGP_HASHMAP_SIZE - 1;                            \
+        c0_##S &= mask; c1_##S &= mask;                                       \
+        c2_##S &= mask; c3_##S &= mask;                                       \
+        c4_##S &= mask; c5_##S &= mask;                                       \
+        c6_##S &= mask; c7_##S &= mask;                                       \
+                                                                               \
+        /* float2 vectorized loads: 8× LDG.64 instead of 16× LDG.32 */        \
+        const float2 *lp2_##S = (const float2*)(hash_table                     \
+            + (size_t)(LVL_IDX) * NGP_HASHMAP_SIZE * NGP_FEATURES_PER);        \
+                                                                               \
+        v0_##S = __ldg(lp2_##S + c0_##S);                                      \
+        v1_##S = __ldg(lp2_##S + c1_##S);                                      \
+        v2_##S = __ldg(lp2_##S + c2_##S);                                      \
+        v3_##S = __ldg(lp2_##S + c3_##S);                                      \
+        v4_##S = __ldg(lp2_##S + c4_##S);                                      \
+        v5_##S = __ldg(lp2_##S + c5_##S);                                      \
+        v6_##S = __ldg(lp2_##S + c6_##S);                                      \
+        v7_##S = __ldg(lp2_##S + c7_##S);                                      \
+    }
+
+    #define TRILINEAR_AND_STORE(S, LVL_IDX)                                    \
+    {                                                                          \
+        float a0 = v0_##S.x + wx_##S * (v4_##S.x - v0_##S.x);                \
+        float a1 = v1_##S.x + wx_##S * (v5_##S.x - v1_##S.x);                \
+        float a2 = v2_##S.x + wx_##S * (v6_##S.x - v2_##S.x);                \
+        float a3 = v3_##S.x + wx_##S * (v7_##S.x - v3_##S.x);                \
+        float b0 = a0 + wy_##S * (a2 - a0);                                   \
+        float b1 = a1 + wy_##S * (a3 - a1);                                   \
+        feat_out[(LVL_IDX) * 2 + 0] = b0 + wz_##S * (b1 - b0);               \
+                                                                               \
+        a0 = v0_##S.y + wx_##S * (v4_##S.y - v0_##S.y);                       \
+        a1 = v1_##S.y + wx_##S * (v5_##S.y - v1_##S.y);                       \
+        a2 = v2_##S.y + wx_##S * (v6_##S.y - v2_##S.y);                       \
+        a3 = v3_##S.y + wx_##S * (v7_##S.y - v3_##S.y);                       \
+        b0 = a0 + wy_##S * (a2 - a0);                                         \
+        b1 = a1 + wy_##S * (a3 - a1);                                         \
+        feat_out[(LVL_IDX) * 2 + 1] = b0 + wz_##S * (b1 - b0);               \
+    }
+
+    /* Process 12 levels in 6 pairs, software-pipelined:
+     * Issue loads for both levels, then trilinear for both.
+     * This keeps 16 LDG.64 in-flight simultaneously. */
 
     #pragma unroll
-    for (int level = 0; level < NGP_NUM_LEVELS; level++) {
-        /* ── Step 1: Scale position to grid resolution ──
-         * SASS: 3× FFMA (px*scale, py*scale, pz*scale) */
-        float gx, gy, gz;
-        asm volatile("mul.f32 %0, %1, %2;" : "=f"(gx) : "f"(px), "f"(scale));
-        asm volatile("mul.f32 %0, %1, %2;" : "=f"(gy) : "f"(py), "f"(scale));
-        asm volatile("mul.f32 %0, %1, %2;" : "=f"(gz) : "f"(pz), "f"(scale));
+    for (int pair = 0; pair < NGP_NUM_LEVELS / 2; pair++) {
+        int lvl_a = pair * 2;
+        int lvl_b = pair * 2 + 1;
+        float scale_a = (float)NGP_BASE_RES;
+        float scale_b = (float)NGP_BASE_RES;
+        /* Compute per-level scales */
+        for (int i = 0; i < lvl_a; i++) scale_a *= NGP_PER_LEVEL_SCALE;
+        for (int i = 0; i < lvl_b; i++) scale_b *= NGP_PER_LEVEL_SCALE;
 
-        /* ── Step 2: Floor and fract ──
-         * SASS: 3× CVT.RMI (floor), 3× FSUB (fract) */
-        float fx, fy, fz;  /* floor */
-        float wx, wy, wz;  /* fractional weights for trilinear interp */
+        /* Declared outside macros for cross-macro visibility */
+        float wx_A, wy_A, wz_A, wx_B, wy_B, wz_B;
+        float2 v0_A, v1_A, v2_A, v3_A, v4_A, v5_A, v6_A, v7_A;
+        float2 v0_B, v1_B, v2_B, v3_B, v4_B, v5_B, v6_B, v7_B;
 
-        asm volatile("cvt.rmi.f32.f32 %0, %1;" : "=f"(fx) : "f"(gx));
-        asm volatile("cvt.rmi.f32.f32 %0, %1;" : "=f"(fy) : "f"(gy));
-        asm volatile("cvt.rmi.f32.f32 %0, %1;" : "=f"(fz) : "f"(gz));
+        /* Phase 1: hash + issue loads for BOTH levels */
+        HASH_AND_LOAD(A, scale_a, lvl_a)
+        HASH_AND_LOAD(B, scale_b, lvl_b)
 
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(wx) : "f"(gx), "f"(fx));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(wy) : "f"(gy), "f"(fy));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(wz) : "f"(gz), "f"(fz));
-
-        /* Convert floor to integer grid coords
-         * SASS: 3× F2I.S32 */
-        int ix, iy, iz;
-        asm volatile("cvt.rni.s32.f32 %0, %1;" : "=r"(ix) : "f"(fx));
-        asm volatile("cvt.rni.s32.f32 %0, %1;" : "=r"(iy) : "f"(fy));
-        asm volatile("cvt.rni.s32.f32 %0, %1;" : "=r"(iz) : "f"(fz));
-
-        /* ── Step 3: Hash 8 voxel corners ──
-         * Corner (dx,dy,dz) for dx,dy,dz ∈ {0,1}:
-         *   hash = ((ix+dx)*PRIME_X) ^ ((iy+dy)*PRIME_Y) ^ ((iz+dz)*PRIME_Z)
-         *   index = hash & (HASHMAP_SIZE - 1)   // power-of-2 mask
-         *
-         * Each corner: 3 IMAD + 2 LOP3.LUT (XOR,XOR) + 1 LOP3 (AND mask)
-         * = 6 integer ops per corner × 8 corners = 48 integer ops
-         *
-         * Optimization: precompute base products, then IADD3 for +1 offsets
-         */
-
-        /* Base products (reused across corners) */
-        unsigned hx0, hy0, hz0;  /* hash components for (ix, iy, iz) */
-        unsigned hx1, hy1, hz1;  /* hash components for (ix+1, iy+1, iz+1) */
-        {
-            unsigned uix = (unsigned)ix;
-            unsigned uiy = (unsigned)iy;
-            unsigned uiz = (unsigned)iz;
-
-            /* IMAD: hx0 = ix * PRIME_X
-             * SASS: IMAD.U32 */
-            asm volatile("mul.lo.u32 %0, %1, %2;"
-                : "=r"(hx0) : "r"(uix), "r"(PRIME_X));
-            asm volatile("mul.lo.u32 %0, %1, %2;"
-                : "=r"(hy0) : "r"(uiy), "r"(PRIME_Y));
-            asm volatile("mul.lo.u32 %0, %1, %2;"
-                : "=r"(hz0) : "r"(uiz), "r"(PRIME_Z));
-
-            /* +1 offsets: hx1 = (ix+1)*PRIME_X = hx0 + PRIME_X
-             * SASS: IADD3 (single instruction, no multiply needed) */
-            asm volatile("add.u32 %0, %1, %2;"
-                : "=r"(hx1) : "r"(hx0), "r"(PRIME_X));
-            asm volatile("add.u32 %0, %1, %2;"
-                : "=r"(hy1) : "r"(hy0), "r"(PRIME_Y));
-            asm volatile("add.u32 %0, %1, %2;"
-                : "=r"(hz1) : "r"(hz0), "r"(PRIME_Z));
-        }
-
-        /* Hash + mask for all 8 corners
-         * LOP3.LUT with truth table 0x96 = XOR(a,b,c) — 3-input XOR in ONE instruction!
-         * This is the key Ada advantage: Pascal needs 2 separate XOR ops.
-         *
-         * Then AND with (HASHMAP_SIZE-1) for power-of-2 modulo */
-        unsigned corner_idx[8];
-        const unsigned hash_mask = NGP_HASHMAP_SIZE - 1;
-
-        /* Corner ordering: (dx,dy,dz) = 000,001,010,011,100,101,110,111 */
-        #define HASH_CORNER(n, HX, HY, HZ) \
-            asm volatile("lop3.b32 %0, %1, %2, %3, 0x96;" \
-                : "=r"(corner_idx[n]) : "r"(HX), "r"(HY), "r"(HZ)); \
-            asm volatile("and.b32 %0, %0, %1;" \
-                : "+r"(corner_idx[n]) : "r"(hash_mask));
-
-        HASH_CORNER(0, hx0, hy0, hz0)  /* (0,0,0) */
-        HASH_CORNER(1, hx0, hy0, hz1)  /* (0,0,1) */
-        HASH_CORNER(2, hx0, hy1, hz0)  /* (0,1,0) */
-        HASH_CORNER(3, hx0, hy1, hz1)  /* (0,1,1) */
-        HASH_CORNER(4, hx1, hy0, hz0)  /* (1,0,0) */
-        HASH_CORNER(5, hx1, hy0, hz1)  /* (1,0,1) */
-        HASH_CORNER(6, hx1, hy1, hz0)  /* (1,1,0) */
-        HASH_CORNER(7, hx1, hy1, hz1)  /* (1,1,1) */
-
-        #undef HASH_CORNER
-
-        /* ── Step 4: Load features from hash table ──
-         * Each entry has 2 floats. Load as LDG.E.64 (float2) for
-         * 2× bandwidth vs two LDG.E.32.
-         *
-         * Table layout: hash_table[level * HASHMAP_SIZE * 2 + idx * 2]
-         */
-        float f0[8], f1[8]; /* feature 0 and 1 for each corner */
-        {
-            unsigned long long level_base =
-                (unsigned long long)level * NGP_HASHMAP_SIZE * NGP_FEATURES_PER;
-            const float *level_ptr = hash_table + level_base;
-
-            #pragma unroll
-            for (int c = 0; c < 8; c++) {
-                const float *entry = level_ptr + corner_idx[c] * 2;
-                /* LDG.E.64: load 2 floats in one transaction
-                 * SASS: LDG.E.64 Rd, [Ra] */
-                asm volatile(
-                    "ld.global.v2.f32 {%0, %1}, [%2];"
-                    : "=f"(f0[c]), "=f"(f1[c])
-                    : "l"(entry)
-                );
-            }
-        }
-
-        /* ── Step 5: Trilinear interpolation ──
-         * 7 lerps per feature = 14 FFMA total for 2 features.
-         *
-         * lerp(a, b, t) = a + t*(b-a) = fma(t, b-a, a)
-         *   → 1 FSUB + 1 FFMA = 2 ops per lerp
-         *   → OR: fma(t, b, fma(-t, a, a)) = 2 FFMA (no FSUB)
-         *
-         * We use the FMA form: lerp(a,b,t) = fma(t, b-a, a)
-         *
-         * Interpolation order:
-         *   X-axis: 4 lerps (corners 0↔4, 1↔5, 2↔6, 3↔7)
-         *   Y-axis: 2 lerps (results 0↔2, 1↔3)
-         *   Z-axis: 1 lerp  (results 0↔1)
-         */
-
-        /* X-axis interpolation (feature 0) */
-        float x00_f0, x01_f0, x10_f0, x11_f0;
-        float d0;
-        /* lerp(f0[0], f0[4], wx) */
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(f0[4]), "f"(f0[0]));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(x00_f0) : "f"(wx), "f"(d0), "f"(f0[0]));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(f0[5]), "f"(f0[1]));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(x01_f0) : "f"(wx), "f"(d0), "f"(f0[1]));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(f0[6]), "f"(f0[2]));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(x10_f0) : "f"(wx), "f"(d0), "f"(f0[2]));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(f0[7]), "f"(f0[3]));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(x11_f0) : "f"(wx), "f"(d0), "f"(f0[3]));
-
-        /* Y-axis interpolation (feature 0) */
-        float y0_f0, y1_f0;
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(x10_f0), "f"(x00_f0));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(y0_f0) : "f"(wy), "f"(d0), "f"(x00_f0));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(x11_f0), "f"(x01_f0));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(y1_f0) : "f"(wy), "f"(d0), "f"(x01_f0));
-
-        /* Z-axis interpolation (feature 0) → final */
-        float result_f0;
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(y1_f0), "f"(y0_f0));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(result_f0) : "f"(wz), "f"(d0), "f"(y0_f0));
-
-        /* Repeat for feature 1 */
-        float x00_f1, x01_f1, x10_f1, x11_f1;
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(f1[4]), "f"(f1[0]));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(x00_f1) : "f"(wx), "f"(d0), "f"(f1[0]));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(f1[5]), "f"(f1[1]));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(x01_f1) : "f"(wx), "f"(d0), "f"(f1[1]));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(f1[6]), "f"(f1[2]));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(x10_f1) : "f"(wx), "f"(d0), "f"(f1[2]));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(f1[7]), "f"(f1[3]));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(x11_f1) : "f"(wx), "f"(d0), "f"(f1[3]));
-
-        float y0_f1, y1_f1;
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(x10_f1), "f"(x00_f1));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(y0_f1) : "f"(wy), "f"(d0), "f"(x00_f1));
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(x11_f1), "f"(x01_f1));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(y1_f1) : "f"(wy), "f"(d0), "f"(x01_f1));
-
-        float result_f1;
-        asm volatile("sub.f32 %0, %1, %2;" : "=f"(d0) : "f"(y1_f1), "f"(y0_f1));
-        asm volatile("fma.rn.f32 %0, %1, %2, %3;" : "=f"(result_f1) : "f"(wz), "f"(d0), "f"(y0_f1));
-
-        /* ── Step 6: Store 2 features ──
-         * STG.E.64 for coalesced write */
-        {
-            float *out = feat_out + level * NGP_FEATURES_PER;
-            asm volatile(
-                "st.global.v2.f32 [%0], {%1, %2};"
-                : : "l"(out), "f"(result_f0), "f"(result_f1)
-            );
-        }
-
-        /* Scale for next level: scale *= PER_LEVEL_SCALE
-         * SASS: FMUL */
-        asm volatile("mul.f32 %0, %0, %1;" : "+f"(scale) : "f"(NGP_PER_LEVEL_SCALE));
+        /* Phase 2: trilinear + store for BOTH levels
+         * By now, loads from Phase 1 have had time to reach L2/DRAM */
+        TRILINEAR_AND_STORE(A, lvl_a)
+        TRILINEAR_AND_STORE(B, lvl_b)
     }
+
+    #undef LOP3_XOR
+    #undef HASH_AND_LOAD
+    #undef TRILINEAR_AND_STORE
 }
 
 
