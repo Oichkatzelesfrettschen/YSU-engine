@@ -133,3 +133,13 @@ All kernels target SM 8.9 (Ada Lovelace, RTX 4070 Ti Super):
 - FFMA latency: ~4.5 cycles, throughput: 128 ops/clk/SM
 - LDG latency: ~33 cycles (L1 hit), ~200 cycles (L2)
 - Shared memory: 100 KB per SM, ~23 cycle latency
+
+## Documentation
+
+Three levels of documentation for different audiences:
+
+| Document | Audience | What it covers |
+|----------|----------|---------------|
+| [EXPLAINED_FOR_EVERYONE.md](docs/EXPLAINED_FOR_EVERYONE.md) | Anyone (no CS background) | What NeRF does, analogies for each kernel, why it matters |
+| [LEARNING_GUIDE.md](docs/LEARNING_GUIDE.md) | Programmers learning GPU optimization | GPU architecture primer, step-by-step algorithm breakdowns, SASS instruction reference, glossary |
+| [TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md) | GPU engineers | Full SASS profiles, arithmetic intensity analysis, optimization rationale, register budgets, error analysis, further optimization paths |
