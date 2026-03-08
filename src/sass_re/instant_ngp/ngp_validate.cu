@@ -38,7 +38,7 @@
 #define TOTAL_WEIGHTS (W0_SIZE + B0_SIZE + W1_SIZE + B1_SIZE + W2_SIZE + B2_SIZE)
 
 /* Test sizes */
-#define TEST_N_POINTS     4096
+#define TEST_N_POINTS     262144  /* 512×512 — realistic NeRF image */
 #define TEST_N_RAYS       1024
 #define TEST_N_STEPS      64
 #define VOL_BLOCK_SIZE    128
