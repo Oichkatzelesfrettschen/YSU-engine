@@ -390,8 +390,9 @@ void ysu_hashgrid_lookup_batch(
     const float *hashgrid_data,
     float features_out[SIMD_BATCH_SIZE][24]
 ) {
-    /* For each level, look up 2 features per position with trilinear interpolation */
-    for (uint32_t level = 0; level < config->num_levels; level++) {
+    /* For each level, look up features per position with trilinear interpolation */
+    uint32_t batch_levels = config->num_levels < 12 ? config->num_levels : 12; /* output array is [24]=12*2 */
+    for (uint32_t level = 0; level < batch_levels; level++) {
         /* Match Python: res = int(base_res * (per_level_scale ** l)) */
         float res = (float)(int)(config->base_res * powf(config->per_level_scale, (float)level));
         uint32_t level_offset = level * config->hashmap_size * config->features_per_entry;
@@ -462,8 +463,10 @@ void ysu_hashgrid_lookup_batch(
                 
                 /* Finally lerp in X */
                 float val = v0 * (1.0f - wx) + v1 * wx;
-                
-                features_out[ray][level * 2 + f] = val;
+
+                /* Bug fix: was `level * 2` — hardcoded stride breaks when
+                 * features_per_entry != 2. Use config->features_per_entry. */
+                features_out[ray][level * config->features_per_entry + f] = val;
             }
         }
     }
@@ -517,8 +520,14 @@ void ysu_mlp_inference_batch(
     uint32_t hidden_dim = config->mlp_hidden_dim;
     uint32_t out_dim = config->mlp_out_dim;
     
-    /* Hidden layer output [8 rays][64 hidden] */
-    float hidden[SIMD_BATCH_SIZE][64];
+    /* Guard: batch hidden arrays are sized for hidden_dim up to 128.
+     * Wider networks are not supported by this fast path. */
+    if (hidden_dim > 128) {
+        fprintf(stderr, "[NeRF] ERROR: hidden_dim=%u exceeds batch inference limit (128)\n", hidden_dim);
+        return;
+    }
+    /* Hidden layer output [8 rays][hidden_dim] */
+    float hidden[SIMD_BATCH_SIZE][128];
     
     /* Get weight pointers — layout is [in_dim][hidden_dim] (row-major) */
     const float *w0 = mlp_weights;
@@ -552,7 +561,7 @@ void ysu_mlp_inference_batch(
     }
     
     /* Layer 1: Hidden -> Hidden (64 -> 64) with ReLU — same cache-friendly pattern */
-    float hidden2[SIMD_BATCH_SIZE][64];
+    float hidden2[SIMD_BATCH_SIZE][128];
     for (uint32_t ray = 0; ray < SIMD_BATCH_SIZE; ray++) {
         for (uint32_t h = 0; h < hidden_dim; h++) {
             hidden2[ray][h] = b1[h];
@@ -573,7 +582,12 @@ void ysu_mlp_inference_batch(
         }
     }
     
-    /* Output layer: Hidden -> Output (64 -> 4) — scan w_out rows contiguously */
+    /* Output layer: Hidden -> Output — scan w_out rows contiguously.
+     * mlp_num_layers > 2 not yet implemented; warn if mismatch. */
+    if (config->mlp_num_layers != 2) {
+        fprintf(stderr, "[NeRF] WARNING: mlp_num_layers=%u but inference is hardcoded for 2 hidden layers\n",
+                config->mlp_num_layers);
+    }
     float out_acc[SIMD_BATCH_SIZE][4];
     for (uint32_t ray = 0; ray < SIMD_BATCH_SIZE; ray++) {
         for (uint32_t o = 0; o < out_dim && o < 4; o++) {
@@ -625,6 +639,12 @@ void ysu_mlp_inference_single(
     uint32_t in_dim = config->mlp_in_dim;
     uint32_t hidden_dim = config->mlp_hidden_dim;
     uint32_t out_dim = config->mlp_out_dim;
+
+    /* Warn if the saved model has a depth we can't handle correctly. */
+    if (config->mlp_num_layers != 2) {
+        fprintf(stderr, "[NeRF] WARNING: mlp_num_layers=%u but single inference is hardcoded for 2 hidden layers\n",
+                config->mlp_num_layers);
+    }
 
     /* Pointers into packed weights/biases (same layout as batch version) */
     const float *w0 = mlp_weights; /* [in_dim][hidden_dim] */
@@ -737,8 +757,10 @@ void ysu_mlp_inference_single(
         }
     }
 
-    /* Apply activations: first 3 are RGB (sigmoid), last is sigma (softplus-like)
-     * If out_dim < 4 handle gracefully. */
+    /* Apply activations: first 3 are RGB (sigmoid), last is sigma (softplus-like).
+     * Fix: initialise sigma_out to 0 before the loop so it is never left
+     * unwritten when out_dim < 4 (e.g. RGB-only checkpoint). */
+    *sigma_out = 0.0f;
     for (uint32_t o = 0; o < out_dim; o++) {
         float val = out_acc[o];
         if (o < 3) {
@@ -812,9 +834,11 @@ void ysu_volume_integrate_batch(
     float bounds_max
 ) {
     /* Process each ray independently within batch */
-    /* Precompute level scales to avoid repeated pow() calls */
-    float level_scales[12];
-    for (uint32_t l = 0; l < config->num_levels && l < 12; l++) {
+    /* Precompute level scales to avoid repeated pow() calls.
+     * Use 20 slots — enough for any foreseeable instant-NGP config (default=16). */
+    float level_scales[20];
+    uint32_t num_levels_clamped = config->num_levels < 20 ? config->num_levels : 20;
+    for (uint32_t l = 0; l < num_levels_clamped; l++) {
         level_scales[l] = config->base_res * powf(config->per_level_scale, (float)l);
     }
     
@@ -835,11 +859,11 @@ void ysu_volume_integrate_batch(
         float accumulated_alpha = 0.0f;
         float base_step = (bounds_max * 2.0f) / (float)num_steps;
         float dir_len = sqrtf(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
-        
-        /* Ray marching loop */
+
+        /* Ray marching loop — t is accumulated so adaptive step_size actually
+         * advances the ray position, not just the alpha weighting. */
+        float t = t_min;
         for (uint32_t step = 0; step < num_steps; step++) {
-            /* Current position along ray */
-            float t = t_min + (float)step * base_step;
             if (t > t_max) break;
             
             Vec3 pos;
@@ -847,7 +871,7 @@ void ysu_volume_integrate_batch(
             pos.y = origin.y + direction.y * t;
             pos.z = origin.z + direction.z * t;
             
-            /* Adaptive step size */
+            /* Adaptive step size — used both for alpha computation AND to advance t. */
             float step_size = ysu_adaptive_step_size(pos, nerf_data->occupancy_grid, config, base_step);
             
             /* Create feature vector for this ray step */
@@ -866,8 +890,8 @@ void ysu_volume_integrate_batch(
             pn.y = fmaxf(0.0f, fminf(1.0f, norm_pos.y * 0.5f + 0.5f));
             pn.z = fmaxf(0.0f, fminf(1.0f, norm_pos.z * 0.5f + 0.5f));
 
-            /* Hashgrid features per level (2 features each) with trilinear interpolation */
-            for (uint32_t level = 0; level < config->num_levels; level++) {
+            /* Hashgrid features per level with trilinear interpolation */
+            for (uint32_t level = 0; level < num_levels_clamped; level++) {
                 /* Use precomputed level scale */
                 float res = level_scales[level];
                 uint32_t level_offset = level * config->hashmap_size * config->features_per_entry;
@@ -927,7 +951,9 @@ void ysu_volume_integrate_batch(
                     float v1 = v10 * (1.0f - wy) + v11 * wy;
                     float val = v0 * (1.0f - wx) + v1 * wx;
                     
-                    feat[level * 2 + f] = val;
+                    /* Bug fix: was hardcoded `level * 2` which is wrong when
+                     * features_per_entry != 2. Use features_per_entry as stride. */
+                    feat[level * config->features_per_entry + f] = val;
                 }
             }
 
@@ -962,6 +988,10 @@ void ysu_volume_integrate_batch(
             accumulated_rgb[2] += rgb_step_scalar[2] * weight;
             accumulated_alpha += weight;
             
+            /* Advance ray position by the adaptive step (fixes the bug where t
+             * was always t_min + step*base_step, making empty-space skip ineffective). */
+            t += step_size;
+
             /* Early termination */
             if (ysu_ray_should_terminate(accumulated_alpha)) {
                 break;
