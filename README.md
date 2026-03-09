@@ -1,6 +1,6 @@
 # YSU Engine
 
-I reverse-engineered NVIDIA's Ada Lovelace GPU assembly (SASS), measured instruction latencies they don't publish, then used that to hand-write Instant-NGP's hot loops in inline PTX — **MLP inference 3.16x faster than what nvcc generates.** The whole thing sits on top of a 40,000-line C11 engine I built from scratch: path tracer, Vulkan GPU compute, NeRF inference, mesh editor, nuclear reactor sim. I'm 16.
+I reverse-engineered NVIDIA's Ada Lovelace GPU assembly (SASS), measured instruction latencies they don't publish, then used that to hand-write Instant-NGP's hot loops in inline PTX — **MLP inference 3.16x faster than what nvcc generates.** The whole thing sits on top of a 35,000-line C11 engine I built from scratch: path tracer, Vulkan GPU compute, NeRF inference, mesh editor, nuclear reactor sim. I'm 16.
 
 ## Highlights
 
@@ -8,7 +8,7 @@ I reverse-engineered NVIDIA's Ada Lovelace GPU assembly (SASS), measured instruc
 
 **Beat the compiler on Instant-NGP** — rewrote the three critical kernels (hash grid encoding, MLP forward, volume rendering) in SASS-level inline PTX. The MLP runs **3.16x** faster. Volume rendering **1.53x**. Hash grid went through three optimization iterations (0.69x regression → 1.03x parity → **1.11x** win) — documented every dead end and fix.
 
-**40K lines of C, zero frameworks** — CPU path tracer with adaptive sampling and deterministic RNG, Vulkan compute with 28 render modes and hybrid mesh+NeRF, RBMK-1000 nuclear reactor thermal simulation with real IAEA material correlations, quantum orbital raymarcher, Blender-style mesh editor. All from scratch.
+**35K lines of C/CUDA/GLSL, zero frameworks** — CPU path tracer with adaptive sampling and deterministic RNG, Vulkan compute with 28 render modes and hybrid mesh+NeRF, RBMK-1000 nuclear reactor thermal simulation with real IAEA material correlations, quantum orbital raymarcher, Blender-style mesh editor. All from scratch.
 
 ### Start here
 
