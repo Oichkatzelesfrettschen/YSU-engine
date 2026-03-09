@@ -8,13 +8,13 @@ typedef struct {
     Vec3 direction;
 } Ray;
 
-// Yeni isimlendirme
+// Newer naming convention
 Ray ray_create(Vec3 origin, Vec3 direction);
 
-// Ray üzerindeki nokta: origin + t * direction
+// Point along ray: origin + t * direction
 Vec3 ray_at(Ray r, float t);
 
-// Eski kodla uyum için alias (sphere.c, material.c vs. bunu çağırıyor)
+// Legacy alias (used by sphere.c, material.c, etc.)
 Ray ray(Vec3 origin, Vec3 direction);
 
 #endif

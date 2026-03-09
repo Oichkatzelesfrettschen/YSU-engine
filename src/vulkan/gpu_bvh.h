@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-// std430 uyumlu, vec4 hizalı
+// std430 compatible, vec4 aligned
 typedef struct {
     float bmin[4];   // xyz + pad
     float bmax[4];   // xyz + pad

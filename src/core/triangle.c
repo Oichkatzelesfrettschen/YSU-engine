@@ -24,8 +24,8 @@ extern int ysu_hit_triangle_asm(
     float* out_v
 );
 
-// ASM sembol adı: triangle_hit_asm.S içinde ysu_hit_triangle_asm olarak export ediliyor.
-// Bu projede AVX2 hit fonksiyonunu o sembole aliaslıyoruz.
+// ASM symbol: exported as ysu_hit_triangle_asm in triangle_hit_asm.S.
+// We alias the AVX2 hit function to that symbol in this project.
 #define ysu_hit_triangle_avx2 ysu_hit_triangle_asm
 
 // ==================================================
@@ -41,6 +41,9 @@ static inline HitRecord no_hit(void)
     rec.material_index = -1;
     rec.u = 0.0f;
     rec.v = 0.0f;
+    rec.b0 = 0.0f;
+    rec.b1 = 0.0f;
+    rec.b2 = 0.0f;
     return rec;
 }
 
@@ -52,6 +55,9 @@ static inline HitRecord make_hit(const Triangle* tri, const Ray* r, float t, flo
     rec.u = u;
     rec.v = v;
     rec.material_index = tri->material_index;
+    rec.b0 = 1.0f - u - v;
+    rec.b1 = u;
+    rec.b2 = v;
 
     rec.point = ray_at(*r, t);
 
@@ -125,7 +131,7 @@ HitRecord triangle_hit(const Triangle* tri, const Ray* r, float t_min, float t_m
 
 #if YSU_TRI_IMPL_AVX2
     ok = ysu_hit_triangle_avx2(tri, r, t_min, t_max, &t, &u, &v);
-    // güvenlik: asm fail olursa C fallback
+    // Safety: fall back to C if ASM fails
     if (!ok) ok = ysu_hit_triangle_c(tri, r, t_min, t_max, &t, &u, &v);
 #else
     ok = ysu_hit_triangle_c(tri, r, t_min, t_max, &t, &u, &v);

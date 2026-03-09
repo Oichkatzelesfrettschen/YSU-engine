@@ -25,7 +25,7 @@ void ysu_nerf_shutdown(void);
 // Scene loader
 #include "sceneloader.h"
 
-// 360 render prototype (header yoksa)
+// 360 render prototype (no header)
 void ysu_render_360(const Camera *cam, const char *out_ppm);
 
 // BVH counters (bvh.c)
@@ -47,7 +47,7 @@ static void print_cfg(int w, int h, int spp, int depth, int threads, int tile) {
 }
 
 // -------------------------
-// deterministic RNG (xorshift32) for baseline (legacy; artık baseline scene.txt'den geliyor)
+// deterministic RNG (xorshift32) for baseline (legacy; baseline now comes from scene.txt)
 // -------------------------
 static inline uint32_t xs32(uint32_t *s) {
     uint32_t x = *s;
@@ -63,12 +63,12 @@ static inline float frand01(uint32_t *s) {
 }
 
 // -------------------------
-// BVH baseline: scene dosyasından sphere yükle
+// BVH baseline: load spheres from scene file
 // -------------------------
 static void ysu_run_cpu_bvh_baseline(const Camera *cam, int w, int h) {
     printf("[BVH] baseline start...\n");
 
-    // Sahne yolu:
+    // Scene path priority:
     // 1) YSU_BASELINE_SCENE env
     // 2) ./scene.txt
     // 3) ./DATA/scene.txt
@@ -89,10 +89,10 @@ static void ysu_run_cpu_bvh_baseline(const Camera *cam, int w, int h) {
             printf("[BVH] baseline: load_scene failed (%s)\n", scene_path);
         }
     } else {
-        // önce ./scene.txt
+        // Try ./scene.txt first
         N = load_scene("./scene.txt", tmp, MAXS);
         if (N <= 0) {
-            // sonra ./DATA/scene.txt
+            // Then ./DATA/scene.txt
             N = load_scene("./DATA/scene.txt", tmp, MAXS);
         }
     }
@@ -112,7 +112,7 @@ static void ysu_run_cpu_bvh_baseline(const Camera *cam, int w, int h) {
         return;
     }
 
-    // SceneSphere -> Sphere (albedo burada kullanılmıyor; mat_id=0)
+    // SceneSphere -> Sphere (albedo not used here; mat_id=0)
     for (int i = 0; i < N; i++) {
         spheres[i] = sphere_create(tmp[i].center, tmp[i].radius, 0);
     }
@@ -292,7 +292,7 @@ int main(void)
 
     // Optional dump (toggle: YSU_DUMP_RGB=1)
     if (getenv("YSU_DUMP_RGB")) {
-        // real implementation yoksa stub aşağıda 0 döner
+        // if no real implementation, stub below returns 0
         (void)ysu_dump_rgb32("output_color.ysub", pixels, image_width, image_height);
     }
 

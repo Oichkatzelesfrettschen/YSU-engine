@@ -25,17 +25,17 @@ static inline float ysu_rng_f01(YSU_Rng *r) {
     return (ysu_rng_u32(r) >> 8) * (1.0f / 16777216.0f);
 }
 
-// Thread sayısı önerisi (env ile override edilebilir)
+// Suggested thread count (can be overridden via env)
 int ysu_mt_suggest_threads(void);
 
-// Render tile job sistemi için: bir worker context
+// Worker context for the render tile job system
 typedef struct {
     int width;
     int height;
     int spp;
     int max_depth;
     int tile_size;
-    void *user; // render tarafının context pointer'ı
+    void *user; // context pointer for the render side
 } YSU_RenderJobConfig;
 
 #endif

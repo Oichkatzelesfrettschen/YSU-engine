@@ -4,13 +4,13 @@
 #include "raylib.h"
 #include "raymath.h"
 
-// Buralar hem topology hem edit tarafında kullanılıyor
-// Sayılar şimdilik rahat olsun, sonra istersen arttırırız.
+// Used by both topology and edit code
+// Limits are generous for now; increase if needed.
 #define MAX_VERTS  8000
 #define MAX_TRIS   4000
 #define YSU_MAX_EDGES   (MAX_TRIS * 3)
 
-// Edit tarafında kullandığımız vertex / tri tipleri
+// Vertex / triangle types used on the edit side
 typedef struct {
     Vector3 pos;
 } EditVertex;
@@ -19,7 +19,7 @@ typedef struct {
     int v[3];
 } EditTri;
 
-// Edge = iki vertex + en fazla iki üçgen (tri0 & tri1)
+// Edge = two vertices + up to two adjacent triangles (tri0 & tri1)
 typedef struct {
     int v0, v1;
     int tri0;
@@ -31,19 +31,19 @@ typedef struct {
     int      edgeCount;
 } MeshTopology;
 
-// Triangle listesinden edge listesi çıkar
+// Build edge list from triangle list
 void Topology_Build(MeshTopology *topo,
                     EditTri *tris, int triCount,
                     int vertCount);
 
-// (v0,v1) edge'inin topo içindeki index'i, yoksa -1
+// Find the index of edge (v0,v1) in topo, or -1 if not found
 int Topology_FindEdge(const MeshTopology *topo,
                       int v0, int v1);
 
-// Blender-vari bevel (tek segmentlik basit chamfer):
-// - yeni vertexler ekler (pVertCount artar)
-// - yeni üçgenler ekler (pTriCount artar)
-// - edge çevresinde 4 üçgenlik bevel bandı oluşturur
+// Blender-style bevel (single-segment simple chamfer):
+// - Adds new vertices (*pVertCount increases)
+// - Adds new triangles (*pTriCount increases)
+// - Creates a 4-triangle bevel band around the edge
 int Mesh_BevelEdge(const MeshTopology *topo,
                    int edgeIndex,
                    int segments,

@@ -72,13 +72,13 @@ Vec3 vec3_reflect(Vec3 v, Vec3 n)
     return vec3_sub(v, vec3_scale(n, 2.0f * d));
 }
 
-// Eski kodun kullandığı isim: unit(v) = normalize(v)
+// Legacy alias: unit(v) = normalize(v)
 Vec3 vec3_unit(Vec3 a)
 {
     return vec3_normalize(a);
 }
 
-// [min,max] aralığında rastgele vektör
+// Random vector in [min,max] range
 static float rand_float01(void)
 {
     return (float)rand() / (float)RAND_MAX;

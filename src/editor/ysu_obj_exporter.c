@@ -9,13 +9,13 @@ int ExportOBJ(const char *path,
 
     fprintf(f, "# Exported from YSU Mesh Edit\n");
 
-    // vertexler
+    // Vertices
     for (int i = 0; i < vertCount; i++) {
         Vector3 p = verts[i].pos;
         fprintf(f, "v %f %f %f\n", p.x, p.y, p.z);
     }
 
-    // üçgen yüzler
+    // Triangle faces
     for (int i = 0; i < triCount; i++) {
         int a = tris[i].v[0] + 1; // OBJ 1-based index
         int b = tris[i].v[1] + 1;

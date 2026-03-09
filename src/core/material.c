@@ -52,7 +52,7 @@ bool material_scatter(const Material *mat,
                       Ray *scattered,
                       Vec3 *attenuation)
 {
-    // Emissive: sadece ışık, scatter yok
+    // Emissive: light only, no scatter
     if (mat->type == MAT_EMISSIVE) {
         *attenuation = vec3(0.0f, 0.0f, 0.0f);
         return false;
@@ -64,7 +64,7 @@ bool material_scatter(const Material *mat,
         case MAT_LAMBERTIAN: {
             Vec3 scatter_dir = vec3_add(normal, random_unit_vector());
 
-            // çok küçük vektör (nümerik sorun) olursa normal'e geri düş
+            // Degenerate scatter direction: fall back to normal
             if (vec3_length_squared(scatter_dir) < 1e-8f) {
                 scatter_dir = normal;
             }
@@ -80,14 +80,14 @@ bool material_scatter(const Material *mat,
             *scattered = ray(hit_point, perturbed);
             *attenuation = mat->albedo;
 
-            // metal için: içeri doğru yansıma varsa absorbe et
+            // Metal: if reflection goes into surface, absorb
             if (vec3_dot(scattered->direction, normal) <= 0.0f) {
                 return false;
             }
         } break;
 
         case MAT_DIELECTRIC: {
-            *attenuation = vec3(1.0f, 1.0f, 1.0f); // cam renksiz kabul
+            *attenuation = vec3(1.0f, 1.0f, 1.0f); // Glass: colorless
 
             float refraction_ratio = vec3_dot(unit_dir, normal) > 0.0f
                                    ? mat->ref_idx

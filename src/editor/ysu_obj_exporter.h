@@ -4,7 +4,7 @@
 #include "raylib.h"
 #include <stdio.h>
 
-// YSU mesh tipleri (editörde kullandığınla bire bir aynı)
+// YSU mesh types (same as used in the editor)
 typedef struct {
     Vector3 pos;
 } EditVertex;

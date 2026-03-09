@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
-// YSU_NEURAL_DENOISE=1 ise ONNX denoise çalıştırır.
+// Runs ONNX denoise if YSU_NEURAL_DENOISE=1.
 // YSU_ONNX_MODEL="path/to/model.onnx"
-// Beklenen IO: float32 NCHW [1,3,H,W] -> [1,3,H,W] (0..1 aralığı)
+// Expected IO: float32 NCHW [1,3,H,W] -> [1,3,H,W] (0..1 range)
 void ysu_neural_denoise_maybe(Vec3 *pixels, int width, int height);
 
 #ifdef __cplusplus

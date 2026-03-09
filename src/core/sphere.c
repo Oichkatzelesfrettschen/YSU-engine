@@ -14,16 +14,17 @@ Sphere sphere_create(Vec3 center, float radius, int material_index)
     s.center = center;
     s.radius = radius;
     s.material_index = material_index;
-    // Varsayılan albedo: beyaz (0–1 arası)
+    // Default albedo: white (0–1 range)
     s.albedo = (Color){ 1.0f, 1.0f, 1.0f };
     return s;
 }
 
-// Sphere için UV (spherical mapping)
+// Spherical UV mapping
 static void sphere_get_uv(Vec3 p, float *out_u, float *out_v)
 {
-    // p = normalleştirilmiş nokta (center'dan çıkan)
-    float theta = acosf(-p.y);
+    // p = unit-length point from center
+    float clamped_y = fmaxf(-1.0f, fminf(1.0f, -p.y));
+    float theta = acosf(clamped_y);
     float phi   = atan2f(-p.z, p.x) + (float)M_PI;
 
     float u = phi / (2.0f * (float)M_PI);
@@ -64,7 +65,7 @@ HitRecord sphere_intersect(const Sphere *s, Ray r, float t_min, float t_max)
     rec.material_index = s->material_index;
     rec.hit            = 1;
 
-    // UV ve barycentric doldur
+    // Fill UV and barycentric coords
     sphere_get_uv(vec3_unit(outward_normal), &rec.u, &rec.v);
     rec.b0 = 1.0f;
     rec.b1 = 0.0f;

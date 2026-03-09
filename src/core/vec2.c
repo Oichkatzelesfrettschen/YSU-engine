@@ -30,9 +30,10 @@ Vec2 vec2_scale(Vec2 a, float s)
     return vec2(a.x * s, a.y * s);
 }
 
-Vec2 vec2_div(Vec2 a, Vec2 b)
+Vec2 vec2_div(Vec2 a, float s)
 {
-    return vec2(a.x / b.x, a.y / b.y);
+    float inv = 1.0f / s;
+    return vec2(a.x * inv, a.y * inv);
 }
 
 float vec2_dot(Vec2 a, Vec2 b)
@@ -84,6 +85,11 @@ Vec2 vec2_perpendicular(Vec2 a)
 float vec2_distance(Vec2 a, Vec2 b)
 {
     return vec2_length(vec2_sub(a, b));
+}
+
+float vec2_distance_squared(Vec2 a, Vec2 b)
+{
+    return vec2_length_squared(vec2_sub(a, b));
 }
 
 Vec2 vec2_clamp(Vec2 a, float min, float max)

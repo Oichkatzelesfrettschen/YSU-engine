@@ -14,19 +14,19 @@ typedef struct {
 static int LoadPPMToTexture(const char *filename, Texture2D *outTex, PpmInfo *info) {
     FILE *f = fopen(filename, "r");
     if (!f) {
-        printf("PPM dosyasi acilamadi: %s\n", filename);
+        printf("Cannot open PPM file: %s\n", filename);
         return 0;
     }
 
     char header[3] = {0};
     if (fscanf(f, "%2s", header) != 1) {
-        printf("PPM header okunamadi.\n");
+        printf("Cannot read PPM header.\n");
         fclose(f);
         return 0;
     }
 
     if (strcmp(header, "P3") != 0) {
-        printf("Sadece ASCII P3 PPM destekleniyor (P3 bekleniyordu, buldugum: %s)\n", header);
+        printf("Only ASCII P3 PPM supported (expected P3, got: %s)\n", header);
         fclose(f);
         return 0;
     }
@@ -44,7 +44,7 @@ static int LoadPPMToTexture(const char *filename, Texture2D *outTex, PpmInfo *in
     ungetc(c, f);
 
     if (fscanf(f, "%d %d", &width, &height) != 2) {
-        printf("PPM genislik/yukseklik okunamadi.\n");
+        printf("Cannot read PPM width/height.\n");
         fclose(f);
         return 0;
     }
@@ -56,14 +56,14 @@ static int LoadPPMToTexture(const char *filename, Texture2D *outTex, PpmInfo *in
     }
 
     if (maxval <= 0 || maxval > 255) {
-        printf("Desteklenmeyen maxval: %d\n", maxval);
+        printf("Unsupported maxval: %d\n", maxval);
         fclose(f);
         return 0;
     }
 
     unsigned char *data = (unsigned char *)malloc((size_t)width * height * 3);
     if (!data) {
-        printf("PPM icin bellek ayrılamadi.\n");
+        printf("Cannot allocate memory for PPM.\n");
         fclose(f);
         return 0;
     }
@@ -71,7 +71,7 @@ static int LoadPPMToTexture(const char *filename, Texture2D *outTex, PpmInfo *in
     for (int i = 0; i < width * height; i++) {
         int r, g, b;
         if (fscanf(f, "%d %d %d", &r, &g, &b) != 3) {
-            printf("PPM piksel verisi eksik.\n");
+            printf("PPM pixel data incomplete.\n");
             free(data);
             fclose(f);
             return 0;
@@ -99,12 +99,12 @@ static int LoadPPMToTexture(const char *filename, Texture2D *outTex, PpmInfo *in
     }
 
     *outTex = LoadTextureFromImage(img);
-    UnloadImage(img); // data'yı free eder
+    UnloadImage(img); // frees data
 
     info->width  = width;
     info->height = height;
 
-    printf("PPM yüklendi: %s (%dx%d)\n", filename, width, height);
+    printf("PPM loaded: %s (%dx%d)\n", filename, width, height);
     return 1;
 }
 
@@ -155,42 +155,42 @@ int main(void) {
     Texture2D panoTex = {0};
     PpmInfo panoInfo = {0};
 
-    // 360 render dosyasi: ysu_360.ppm
+    // 360 render file: ysu_360.ppm
     if (!LoadPPMToTexture("ysu_360.ppm", &panoTex, &panoInfo)) {
-        printf("ysu_360.ppm bulunamadi veya okunamadi. Once ysuengine.exe calistir.\n");
+        printf("ysu_360.ppm not found or unreadable. Run ysuengine.exe first.\n");
     }
 
-    // Shader'i bellekteki string'ten yükle
+    // Load shader from in-memory string
     Shader sh360 = LoadShaderFromMemory(NULL, fs360);
     int locYaw   = GetShaderLocation(sh360, "yaw");
     int locPitch = GetShaderLocation(sh360, "pitch");
     int locFovY  = GetShaderLocation(sh360, "fovY");
 
-    // Başlangıç FOV
+    // Initial FOV
     float fovDeg = 60.0f;
     float fovRad = fovDeg * (3.14159265359f / 180.0f);
     SetShaderValue(sh360, locFovY, &fovRad, SHADER_UNIFORM_FLOAT);
 
-    // Başlangıç kamera açıları
-    float yaw   = 0.0f;  // sağ-sol
-    float pitch = 0.0f;  // yukarı-aşağı
+    // Initial camera angles
+    float yaw   = 0.0f;  // left-right
+    float pitch = 0.0f;  // up-down
 
     Vector2 lastMouse = {0};
     int rotating = 0;
-    const float mouseSens = 0.005f; // hassasiyet
+    const float mouseSens = 0.005f; // sensitivity
 
     while (!WindowShouldClose()) {
-        // R: 360 dosyayi yeniden yukle (ysuengine yeni render ürettiğinde)
+        // R: Reload 360 file (when ysuengine produces a new render)
         if (IsKeyPressed(KEY_R)) {
             if (LoadPPMToTexture("ysu_360.ppm", &panoTex, &panoInfo)) {
-                printf("ysu_360.ppm yeniden yüklendi.\n");
+                printf("ysu_360.ppm reloaded.\n");
             }
         }
 
-        // Mouse wheel ile zoom (FOV)
+        // Mouse wheel zoom (FOV)
         float wheel = GetMouseWheelMove();
         if (wheel != 0.0f) {
-            // ileri wheel pozitif -> FOV küçülsün (zoom in)
+            // Forward wheel positive -> shrink FOV (zoom in)
             fovDeg -= wheel * 5.0f;
             if (fovDeg < 20.0f)  fovDeg = 20.0f;
             if (fovDeg > 100.0f) fovDeg = 100.0f;
@@ -198,7 +198,7 @@ int main(void) {
             SetShaderValue(sh360, locFovY, &fovRad, SHADER_UNIFORM_FLOAT);
         }
 
-        // LMB veya Alt+LMB ile çevrene bak
+        // LMB or Alt+LMB to look around
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) ||
             (IsKeyDown(KEY_LEFT_ALT) && IsMouseButtonDown(MOUSE_BUTTON_LEFT))) {
 
@@ -225,7 +225,7 @@ int main(void) {
             rotating = 0;
         }
 
-        // Shader'a yeni açıları gönder
+        // Send updated angles to shader
         SetShaderValue(sh360, locYaw,   &yaw,   SHADER_UNIFORM_FLOAT);
         SetShaderValue(sh360, locPitch, &pitch, SHADER_UNIFORM_FLOAT);
 
@@ -235,7 +235,7 @@ int main(void) {
         if (panoTex.id != 0) {
             BeginShaderMode(sh360);
 
-            // Tam ekran quad çiz – UV [0,1] araliginda, shader kendi 360 projeksiyonu yapiyor
+            // Draw fullscreen quad – UV [0,1], shader handles 360 projection
             Rectangle src = { 0.0f, 0.0f, (float)panoTex.width, (float)panoTex.height };
             Rectangle dst = { 0.0f, 0.0f, (float)screenWidth,   (float)screenHeight };
             Vector2 origin = { 0.0f, 0.0f };
@@ -243,11 +243,11 @@ int main(void) {
 
             EndShaderMode();
 
-            DrawText("LMB / ALT+LMB: etrafa bak", 10, 10, 18, RAYWHITE);
+            DrawText("LMB / ALT+LMB: look around", 10, 10, 18, RAYWHITE);
             DrawText("Mouse wheel: zoom in/out", 10, 32, 16, RAYWHITE);
-            DrawText("R: ysu_360.ppm yeniden yukle", 10, 52, 16, RAYWHITE);
+            DrawText("R: reload ysu_360.ppm", 10, 52, 16, RAYWHITE);
         } else {
-            DrawText("ysu_360.ppm bulunamadi. Once ysuengine.exe calistir.", 40, screenHeight/2 - 10, 20, RAYWHITE);
+            DrawText("ysu_360.ppm not found. Run ysuengine.exe first.", 40, screenHeight/2 - 10, 20, RAYWHITE);
         }
 
         EndDrawing();

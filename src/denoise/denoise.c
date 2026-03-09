@@ -1,4 +1,4 @@
-// denoise.c  — edge-aware denoiser (basit bilateral tarzı)
+// denoise.c  — edge-aware denoiser (simple bilateral style)
 
 #include <stdlib.h>
 #include <math.h>
@@ -25,9 +25,9 @@ void denoise_box(Vec3 *pixels, int width, int height, int radius)
         return;
     }
 
-    // radius ne kadar büyükse uzamsal sigma da o kadar büyük
+    // Larger radius = wider spatial sigma
     float sigma_space = (float)radius * 0.75f;
-    float sigma_color = 0.15f;   // renk farkı hassasiyeti (0–1 aralığı için)
+    float sigma_color = 0.15f;   // Color difference sensitivity (0–1 range)
     float two_sigma_space2 = 2.0f * sigma_space * sigma_space;
     float two_sigma_color2 = 2.0f * sigma_color * sigma_color;
 

@@ -11,7 +11,7 @@
 #if __STDC_VERSION__ >= 201112L
   #include <stdatomic.h>
 #else
-  #error "C11 gerekiyor (stdatomic). GCC'de -std=c11 kullan."
+  #error "C11 required (stdatomic). Use -std=c11 in GCC."
 #endif
 
 #include <pthread.h>
@@ -398,3 +398,4 @@ void ysu_render_360(Camera* cam, const char* out_ppm) {
     free(pixels);
     printf("YSU 360: tamam.\n");
 }
+//kill me -later
