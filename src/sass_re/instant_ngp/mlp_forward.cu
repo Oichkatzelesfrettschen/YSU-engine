@@ -14,10 +14,26 @@
  *   - MUFU.EX2 for fast sigmoid: sig(x) = 1/(1+2^(-x/ln2))
  *   - Register blocking: each thread computes one sample's full MLP
  *
- * Weight layout (matches engine NeRFConfig):
- *   W0: [64][27]  B0: [64]    — layer 0
- *   W1: [64][64]  B1: [64]    — layer 1
- *   W2: [4][64]   B2: [4]     — output layer
+ * Weight layout (GPU — this file):
+ *   W0: [64][27]  — row i = neuron i's weights over 27 inputs   [hidden][in]
+ *   W1: [64][64]  — row i = neuron i's weights over 64 hidden   [hidden][hidden]
+ *   W2: [4][64]   — row o = output neuron o's weights            [out][hidden]
+ *   B0: [64]  B1: [64]  B2: [4]
+ *
+ * *** LAYOUT WARNING — CPU vs GPU mismatch ***
+ *   The CPU inference kernel (src/nerf/nerf_simd.c :: ysu_mlp_inference_batch)
+ *   stores W0 as [in][hidden] = [27][64], accessing w0[i * hidden_dim + h].
+ *   This GPU kernel stores W0 as [hidden][in] = [64][27], accessing
+ *   W0[neuron * MLP_IN + j].  These layouts are the TRANSPOSE of each other.
+ *
+ *   Consequence: a weight file produced by GPU training CANNOT be loaded
+ *   directly into the CPU inference path.  The W0 and W1 matrices must be
+ *   transposed column-major ↔ row-major before CPU use.  W2 (output layer)
+ *   layout is [out][hidden] on both GPU and CPU (matches, no transpose needed).
+ *
+ *   If you intend to share checkpoints between GPU and CPU code, transpose W0
+ *   and W1 at checkpoint-export time, or add a load-time transpose in
+ *   ysu_nerf_load() in src/nerf/nerf_simd.c.
  *
  * Target: SM 8.9 (Ada Lovelace)
  */
