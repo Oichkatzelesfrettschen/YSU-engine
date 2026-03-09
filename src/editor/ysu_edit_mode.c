@@ -27,7 +27,7 @@ typedef enum {
     AXIS_Z    = 3
 } TransformAxis;
 
-// ---------- Edit mesh (küp) için yapılar ----------
+// ---------- Edit mesh (cube) structures ----------
 
 #define MAX_EDIT_VERTS 16
 #define MAX_EDIT_EDGES 32
@@ -48,7 +48,7 @@ static int        g_numEditEdges = 0;
 
 static int        g_selectedEdge = -1;
 
-// Küçük bir küp oluştur (merkez 0,0.5,0 civarı)
+// Create a small cube (centered around 0,0.5,0)
 static void InitEditCube(void)
 {
     g_numEditVerts = 8;
@@ -69,36 +69,36 @@ static void InitEditCube(void)
     g_editVerts[7].pos = (Vector3){ -s, y1,  s };
 
     int e = 0;
-    // Alt yüz
+    // Bottom face
     g_editEdges[e++] = (EditEdge){0,1};
     g_editEdges[e++] = (EditEdge){1,2};
     g_editEdges[e++] = (EditEdge){2,3};
     g_editEdges[e++] = (EditEdge){3,0};
-    // Üst yüz
+    // Top face
     g_editEdges[e++] = (EditEdge){4,5};
     g_editEdges[e++] = (EditEdge){5,6};
     g_editEdges[e++] = (EditEdge){6,7};
     g_editEdges[e++] = (EditEdge){7,4};
-    // Dikey kenarlar
+    // Vertical edges
     g_editEdges[e++] = (EditEdge){0,4};
     g_editEdges[e++] = (EditEdge){1,5};
     g_editEdges[e++] = (EditEdge){2,6};
     g_editEdges[e++] = (EditEdge){3,7};
 }
 
-// ---------- Ortak yardımcılar ----------
+// ---------- Common helpers ----------
 
 static int save_scene(const char *path, SceneSphere *spheres, int count)
 {
     FILE *f = fopen(path, "w");
     if (!f) {
-        printf("scene.txt yazmak icin acilamadi.\n");
+        printf("Cannot open scene.txt for writing.\n");
         return 0;
     }
 
     for (int i = 0; i < count; ++i) {
         SceneSphere *s = &spheres[i];
-        // Şu an sadece sphere verisini yazıyoruz
+        // Currently only writing sphere data
         fprintf(f, "sphere %f %f %f %f %f %f %f\n",
                 s->center.x,  s->center.y,  s->center.z,
                 s->radius,
@@ -106,7 +106,7 @@ static int save_scene(const char *path, SceneSphere *spheres, int count)
     }
 
     fclose(f);
-    printf("scene.txt kaydedildi (%d sphere).\n", count);
+    printf("scene.txt saved (%d sphere).\n", count);
     return 1;
 }
 
@@ -141,11 +141,11 @@ static int add_sphere(SceneSphere *spheres, int *pCount, Vec3 center, float radi
     spheres[idx].radius = radius;
     spheres[idx].albedo = albedo;
 
-    printf("Edit mode: yeni sphere eklendi (index=%d)\n", idx);
+    printf("Edit mode: new sphere added (index=%d)\n", idx);
     return idx;
 }
 
-// Ray - segment arası en küçük mesafenin karesi
+// Squared distance from ray to line segment
 static float DistanceRayToSegmentSq(Ray ray, Vector3 a, Vector3 b)
 {
     Vector3 v = Vector3Subtract(b, a);
@@ -218,29 +218,29 @@ int main(void)
     Vector2 grabStartMouse  = {0};
     Vec3    grabStartCenter = {0};
 
-    // Sphere rotate (şimdilik basit – sadece y ekseni göstergesi için yer bırakıyoruz)
+    // Sphere rotate (simple — just reserving y-axis rotation for now)
     Vector2 rotStartMouse   = {0};
-    float   rotStartYawDeg  = 0.0f;  // sadece y ekseni etrafında açı
-    float   sphereYawDeg[MAX_SCENE_SPHERES] = {0}; // her sphere için basit yaw
+    float   rotStartYawDeg  = 0.0f;  // y-axis angle only
+    float   sphereYawDeg[MAX_SCENE_SPHERES] = {0}; // per-sphere yaw
 
     // Edge grab
     Vector2 edgeGrabStartMouse = {0};
     Vector3 edgeStartV0 = {0};
     Vector3 edgeStartV1 = {0};
 
-    // Edit mesh (küp)
+    // Edit mesh (cube)
     InitEditCube();
 
-    // İlk scene.txt yükle
+    // Load initial scene.txt
     sphereCount = load_scene("scene.txt", spheres, MAX_SCENE_SPHERES);
     if (sphereCount > 0) {
         selectedSphere = 0;
     }
-    printf("Edit mode: scene.txt içinden %d sphere yüklendi.\n", sphereCount);
+    printf("Edit mode: loaded %d spheres from scene.txt.\n", sphereCount);
 
     while (!WindowShouldClose())
     {
-        // ---------- Kamera kontrolü ----------
+        // ---------- Camera controls ----------
         float wheel = GetMouseWheelMove();
         distance -= wheel * 0.5f;
         if (distance < 1.5f) distance = 1.5f;
@@ -270,7 +270,7 @@ int main(void)
         cam.position.z = target.z + distance * cp * sinf(yaw);
         cam.target = target;
 
-        // Kamera yön vektörleri
+        // Camera direction vectors
         Vector3 forward = Vector3Subtract(cam.target, cam.position);
         if (Vector3Length(forward) < 0.001f) {
             forward = (Vector3){0.0f, 0.0f, 1.0f};
@@ -315,17 +315,17 @@ int main(void)
             if (idx >= 0) selectedSphere = idx;
         }
 
-        // ---------- Sphere seçimi (TAB) ----------
+        // ---------- Sphere selection (TAB) ----------
         if (sphereCount > 0 && mode == TRANSFORM_NONE) {
             if (IsKeyPressed(KEY_TAB)) {
                 selectedSphere = (selectedSphere + 1) % sphereCount;
-                g_selectedEdge = -1; // edge selection'ı temizle
+                g_selectedEdge = -1; // clear edge selection
             }
         }
 
-        // ---------- Grab başlatma (G) ----------
+        // ---------- Grab start (G) ----------
         if (mode == TRANSFORM_NONE && IsKeyPressed(KEY_G)) {
-            // Önce edge öncelikli
+            // Edge selection takes priority
             if (g_selectedEdge >= 0) {
                 mode = TRANSFORM_GRAB_EDGE;
                 axis = AXIS_FREE;
@@ -333,26 +333,26 @@ int main(void)
                 EditEdge e = g_editEdges[g_selectedEdge];
                 edgeStartV0 = g_editVerts[e.v0].pos;
                 edgeStartV1 = g_editVerts[e.v1].pos;
-                printf("EDGE GRAB mode basladi. edge=%d\n", g_selectedEdge);
+                printf("EDGE GRAB mode started. edge=%d\n", g_selectedEdge);
             }
-            // Edge yoksa sphere
+            // If no edge, grab sphere
             else if (sphereCount > 0 && selectedSphere >= 0) {
                 mode = TRANSFORM_GRAB_SPHERE;
                 axis = AXIS_FREE;
                 grabStartMouse  = GetMousePosition();
                 grabStartCenter = spheres[selectedSphere].center;
-                printf("SPHERE GRAB mode basladi. sphere=%d\n", selectedSphere);
+                printf("SPHERE GRAB mode started. sphere=%d\n", selectedSphere);
             }
         }
 
-        // ---------- Rotate başlatma (R) – sadece sphere ----------
+        // ---------- Rotate start (R) – sphere only ----------
         if (sphereCount > 0 && selectedSphere >= 0 && mode == TRANSFORM_NONE) {
             if (IsKeyPressed(KEY_R)) {
                 mode = TRANSFORM_ROTATE_SPHERE;
                 axis = AXIS_FREE;
                 rotStartMouse  = GetMousePosition();
                 rotStartYawDeg = sphereYawDeg[selectedSphere];
-                printf("SPHERE ROTATE mode basladi. sphere=%d\n", selectedSphere);
+                printf("SPHERE ROTATE mode started. sphere=%d\n", selectedSphere);
             }
         }
 
@@ -366,18 +366,18 @@ int main(void)
             if (IsKeyPressed(KEY_Z)) { axis = AXIS_Z; printf("Axis: Z\n"); }
         }
 
-        // ---------- SPHERE GRAB güncelle ----------
+        // ---------- SPHERE GRAB update ----------
         if (mode == TRANSFORM_GRAB_SPHERE && sphereCount > 0 && selectedSphere >= 0) {
             SceneSphere *s = &spheres[selectedSphere];
 
             if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER)) {
                 mode = TRANSFORM_NONE;
-                printf("SPHERE GRAB onaylandi.\n");
+                printf("SPHERE GRAB confirmed.\n");
             }
             else if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || IsKeyPressed(KEY_ESCAPE)) {
                 s->center = grabStartCenter;
                 mode = TRANSFORM_NONE;
-                printf("SPHERE GRAB iptal.\n");
+                printf("SPHERE GRAB cancelled.\n");
             }
             else {
                 Vector2 m = GetMousePosition();
@@ -410,19 +410,19 @@ int main(void)
             }
         }
 
-        // ---------- EDGE GRAB güncelle ----------
+        // ---------- EDGE GRAB update ----------
         if (mode == TRANSFORM_GRAB_EDGE && g_selectedEdge >= 0) {
             EditEdge e = g_editEdges[g_selectedEdge];
 
             if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER)) {
                 mode = TRANSFORM_NONE;
-                printf("EDGE GRAB onaylandi.\n");
+                printf("EDGE GRAB confirmed.\n");
             }
             else if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || IsKeyPressed(KEY_ESCAPE)) {
                 g_editVerts[e.v0].pos = edgeStartV0;
                 g_editVerts[e.v1].pos = edgeStartV1;
                 mode = TRANSFORM_NONE;
-                printf("EDGE GRAB iptal.\n");
+                printf("EDGE GRAB cancelled.\n");
             }
             else {
                 Vector2 m = GetMousePosition();
@@ -456,23 +456,23 @@ int main(void)
             }
         }
 
-        // ---------- SPHERE ROTATE güncelle (sadece yaw) ----------
+        // ---------- SPHERE ROTATE update (yaw only) ----------
         if (mode == TRANSFORM_ROTATE_SPHERE && sphereCount > 0 && selectedSphere >= 0) {
             if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) || IsKeyPressed(KEY_ENTER)) {
                 mode = TRANSFORM_NONE;
-                printf("SPHERE ROTATE onaylandi.\n");
+                printf("SPHERE ROTATE confirmed.\n");
             }
             else if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || IsKeyPressed(KEY_ESCAPE)) {
                 sphereYawDeg[selectedSphere] = rotStartYawDeg;
                 mode = TRANSFORM_NONE;
-                printf("SPHERE ROTATE iptal.\n");
+                printf("SPHERE ROTATE cancelled.\n");
             }
             else {
                 Vector2 m = GetMousePosition();
                 Vector2 d = { m.x - rotStartMouse.x, m.y - rotStartMouse.y };
 
-                float rotScale = 0.3f; // 1 pixel -> 0.3 derece
-                float newYaw = rotStartYawDeg + d.x * rotScale; // yaw = ekran X
+                float rotScale = 0.3f; // 1 pixel -> 0.3 degrees
+                float newYaw = rotStartYawDeg + d.x * rotScale; // yaw = screen X
                 sphereYawDeg[selectedSphere] = newYaw;
             }
         }
@@ -483,7 +483,7 @@ int main(void)
                 sphereCount = load_scene("scene.txt", spheres, MAX_SCENE_SPHERES);
                 if (sphereCount > 0) selectedSphere = 0;
                 else selectedSphere = -1;
-                printf("scene.txt yeniden yüklendi (%d sphere).\n", sphereCount);
+                printf("scene.txt reloaded (%d sphere).\n", sphereCount);
             }
 
             if (IsKeyPressed(KEY_F5)) {
@@ -491,7 +491,7 @@ int main(void)
             }
         }
 
-        // ---------- Çizim ----------
+        // ---------- Drawing ----------
         BeginDrawing();
         ClearBackground((Color){ 18, 18, 24, 255 });
 
@@ -499,7 +499,7 @@ int main(void)
 
         DrawGrid(20, 1.0f);
 
-        // Küreler
+        // Spheres
         for (int i = 0; i < sphereCount; ++i) {
             SceneSphere *s = &spheres[i];
             Vector3 pos = { s->center.x, s->center.y, s->center.z };
@@ -512,7 +512,7 @@ int main(void)
 
             DrawSphere(pos, s->radius, col);
 
-            // Basit yaw oku
+            // Simple yaw arrow
             float yawDeg = sphereYawDeg[i];
             float yawRad = yawDeg * DEG2RAD;
             Vector3 dir = { cosf(yawRad), 0.0f, sinf(yawRad) };
@@ -524,7 +524,7 @@ int main(void)
             DrawLine3D(pos, arrowEnd, (Color){255,80,80,255});
         }
 
-        // Edit küp vertex & edge’leri
+        // Edit cube vertices & edges
         for (int i = 0; i < g_numEditEdges; ++i) {
             EditEdge e = g_editEdges[i];
             Vector3 a = g_editVerts[e.v0].pos;

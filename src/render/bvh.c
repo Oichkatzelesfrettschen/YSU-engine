@@ -1,4 +1,4 @@
-// bvh.c (PASS-2 policy-aware + güvenli sayım + opsiyonel fiziksel pruning)
+// bvh.c (PASS-2 policy-aware + safe counting + optional physical pruning)
 #include "bvh.h"
 #include <stdlib.h>
 #include <math.h>
@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// ===== HEDEF-0 GLOBAL SAYAÇLAR =====
+// ===== TARGET-0 GLOBAL COUNTERS =====
 uint64_t g_bvh_node_visits = 0;
 uint64_t g_bvh_aabb_tests  = 0;
 
@@ -58,7 +58,7 @@ aabb aabb_surrounding(aabb b0, aabb b1) {
     return box;
 }
 
-// slab test (ölçüm dahil) — float precision (halves bandwidth vs double)
+// Slab test (with counting) — float precision (halves bandwidth vs double)
 bool aabb_hit(const aabb* box, const Ray* r, float t_min, float t_max) {
     g_bvh_aabb_tests++;
 
@@ -80,7 +80,7 @@ bool aabb_hit(const aabb* box, const Ray* r, float t_min, float t_max) {
     return true;
 }
 
-// child ordering için (SAYAÇ ARTIRMAZ) — float precision
+// Child ordering helper (does NOT increment counters) — float precision
 static inline float aabb_entry_tmin_no_count(const aabb* box, const Ray* r) {
     float t_min = -1e30f;
     float t_max =  1e30f;
@@ -104,7 +104,7 @@ static inline float aabb_entry_tmin_no_count(const aabb* box, const Ray* r) {
 }
 
 // ============================================================
-// BVH BUILD (median split)  - zip'indeki mevcut yaklaşım
+// BVH BUILD (median split) — existing approach
 // ============================================================
 
 // --- qsort comparators (O(n log n), cache-friendly vs bubble sort) ---
@@ -254,7 +254,7 @@ static uint8_t policy_lookup_sorted(const PolicyPair* arr, int n, uint32_t id) {
         if (v < id) lo = mid + 1;
         else hi = mid - 1;
     }
-    return 0; // default: prune kapalı
+    return 0; // default: pruning off
 }
 
 static void bvh_apply_policy_rec(bvh_node* n, const PolicyPair* arr, int n_pairs) {
@@ -264,7 +264,7 @@ static void bvh_apply_policy_rec(bvh_node* n, const PolicyPair* arr, int n_pairs
     bvh_apply_policy_rec(n->right, arr, n_pairs);
 }
 
-// ✅ Stack overflow yok: pruned sayımı recursion
+// Safe recursion for counting pruned nodes
 static int bvh_count_pruned_rec(const bvh_node* n) {
     if (!n) return 0;
     int c = n->prune ? 1 : 0;
@@ -272,7 +272,7 @@ static int bvh_count_pruned_rec(const bvh_node* n) {
 }
 
 // ============================================================
-// Opsiyonel: Fiziksel pruning (default KAPALI)
+// Optional: Physical pruning (default OFF)
 // ============================================================
 
 #ifndef YSU_POLICY_PHYSICAL_PRUNE
@@ -287,7 +287,7 @@ static void bvh_prune_subtrees_inplace(bvh_node* n) {
         n->left  = NULL;
         n->right = NULL;
 
-        // leaf gibi boşalt (güvenli)
+        // Clear as leaf (safe for arena nodes)
         n->start = 0;
         n->count = 0;
         return;
@@ -313,7 +313,7 @@ int bvh_load_policy_csv(const char* path, bvh_node* root) {
 
     char line[256];
 
-    // header skip: ilk satır digit değilse header say
+    // Header skip: if first line doesn't start with a digit, treat as header
     long pos0 = ftell(f);
     if (fgets(line, sizeof(line), f)) {
         if (line[0] >= '0' && line[0] <= '9') {
@@ -360,7 +360,7 @@ int bvh_load_policy_csv(const char* path, bvh_node* root) {
     bvh_apply_policy_rec(root, pairs, n);
 
 #if YSU_POLICY_PHYSICAL_PRUNE
-    // İstersen aç: subtree'leri gerçekten koparır (daha agresif)
+    // Enable to actually detach subtrees (more aggressive pruning)
     bvh_prune_subtrees_inplace(root);
 #endif
 
@@ -376,7 +376,7 @@ int bvh_load_policy_csv(const char* path, bvh_node* root) {
 // BVH HIT (near-first + PASS-2 policy-aware prune)
 // ============================================================
 
-// Projende render.c tarafının kullandığı intersection: HitRecord döndürür.
+// BVH intersection used by render.c: returns HitRecord.
 extern HitRecord sphere_intersect(const Sphere *s, Ray r, float t_min, float t_max);
 
 bool bvh_hit(

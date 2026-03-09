@@ -3,15 +3,15 @@
 
 #include "vec3.h"
 
-// Editörden gelen sahne için basit veri yapısı
+// Simple data type for scene spheres from editor
 typedef struct {
     Vec3 center;
     float radius;
-    Vec3 albedo; // 0–1 arası renk
+    Vec3 albedo; // 0–1 color range
 } SceneSphere;
 
-// scene.txt dosyasını okur, en fazla max_spheres kadar doldurur.
-// Başarılı okunan küre sayısını döner.
+// Reads scene.txt, fills up to max_spheres.
+// Returns number of spheres successfully read.
 int load_scene(const char *path, SceneSphere *out, int max_spheres);
 
 #endif

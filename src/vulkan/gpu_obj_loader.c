@@ -162,6 +162,7 @@ int gpu_load_obj_triangles(const char* path, GPUTriangle** out_tris, size_t* out
     
     *out_tris = tris;
     *out_count = tri_count;
+    free(quads);
     fprintf(stderr, "[OBJ] Loaded %zu triangles from %s\n", tri_count, path);
     return 1;
 }

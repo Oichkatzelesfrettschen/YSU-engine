@@ -82,7 +82,7 @@ void ysu_neural_denoise_maybe(Vec3 *pixels, int width, int height)
     // 2) SessionOptions
     if (api->CreateSessionOptions(&so) != NULL) goto fail;
 
-    // Önerim: render zaten MT -> ORT tek/az thread
+    // Recommendation: render already uses MT -> keep ORT to single/low thread count
     int intra = ysu_env_int("YSU_ONNX_INTRA", 1);
     int inter = ysu_env_int("YSU_ONNX_INTER", 1);
     api->SetIntraOpNumThreads(so, intra);
@@ -127,7 +127,7 @@ void ysu_neural_denoise_maybe(Vec3 *pixels, int width, int height)
         }
     }
 
-    // 6) Names (basit yaklaşım: modelin ilk input/output ismini al)
+    // 6) Names (simple approach: get the first input/output name from the model)
     OrtAllocator *allocator = NULL;
     api->GetAllocatorWithDefaultOptions(&allocator);
 
@@ -171,7 +171,7 @@ void ysu_neural_denoise_maybe(Vec3 *pixels, int width, int height)
         api->GetTensorMutableData(output_tensor, (void**)&out_data);
         if (!out_data) goto fail3;
 
-        // output_tensor out_data zaten modelin buffer'ı; direkt pixels’e yazabiliriz.
+        // output_tensor out_data is the model's buffer; write directly to pixels.
         nchw_to_pixels(out_data, pixels, width, height);
     }
 

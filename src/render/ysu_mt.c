@@ -22,7 +22,7 @@ int ysu_mt_suggest_threads(void) {
     return (n > 0) ? n : 4;
 #else
     // GCC/Clang: fallback
-    // (POSIX sysconf kullanmak istersen ekleriz)
+    // (Could use POSIX sysconf here if needed)
     return 8;
 #endif
 }

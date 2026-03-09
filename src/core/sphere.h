@@ -4,7 +4,7 @@
 #include "vec3.h"
 #include "ray.h"
 #include "color.h"
-#include "primitives.h"   // HitRecord buradan gelecek
+#include "primitives.h"   // HitRecord comes from here
 
 typedef struct {
     Vec3  center;

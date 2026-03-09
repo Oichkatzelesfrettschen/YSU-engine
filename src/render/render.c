@@ -1,4 +1,4 @@
-// render.c (FULL) - pthread threadpool + chunked jobs + tile renderer + RNG + fog + debug + minimal test scene
+﻿// render.c (FULL) - pthread threadpool + chunked jobs + tile renderer + RNG + fog + debug + minimal test scene
 #include "render.h"
 #include "image.h"
 
@@ -21,7 +21,7 @@
 #if __STDC_VERSION__ >= 201112L
   #include <stdatomic.h>
 #else
-  #error "C11 gerekiyor (stdatomic). GCC'de -std=c11 kullan."
+  #error "C11 required (stdatomic). Use -std=c11 in GCC."
 #endif
 
 #include <pthread.h>
@@ -36,7 +36,7 @@
 #include "nerf_simd.h"
 
 // ================================================================
-// Adaptive sampling config + stats (env kontrollü)
+// Adaptive sampling config + stats (env-controlled)
 // ================================================================
 
 static int   g_adapt_enabled = 0;
@@ -461,7 +461,7 @@ void render_scene_st(Vec3 *pixels,
 // THREAD POOL (persistent)
 // =====================================================================
 
-// Atomic job counter + “job chunk” ile contention azaltıyoruz
+// Atomic job counter + "job chunk" to reduce contention
 #define JOB_CHUNK 8
 
 typedef struct {
@@ -822,7 +822,7 @@ void render_nerf_cpu(Vec3 *pixels,
         norm_pos.z = (test_pos.z - nerf_data->config.center.z) / nerf_data->config.scale;
         
         float feat[27] = {0};
-        for (uint32_t level = 0; level < nerf_data->config.num_levels; level++) {
+        for (uint32_t level = 0; level < nerf_data->config.num_levels && level < 12; level++) {
             float level_scale = nerf_data->config.base_res * powf(nerf_data->config.per_level_scale, (float)level);
             int32_t x = (int32_t)floorf(norm_pos.x * level_scale);
             int32_t y = (int32_t)floorf(norm_pos.y * level_scale);

@@ -2,9 +2,9 @@
 #include "primitives.h"
 #include <math.h>
 
-// Bu dosya yalnızca "diğer primitive" fonksiyonlarını sağlar.
-// triangle_make() ve hit_triangle() zaten triangle.c içinde tanımlı.
-// Bu yüzden burada TEKRAR tanımlamıyoruz (aksi halde multiple definition olur).
+// This file provides "other primitive" hit functions.
+// triangle_make() and hit_triangle() are defined in triangle.c.
+// We do NOT redefine them here (would cause multiple-definition errors).
 
 static HitRecord no_hit_record(void) {
     HitRecord rec;
@@ -14,7 +14,7 @@ static HitRecord no_hit_record(void) {
     rec.normal = vec3(0.0f, 0.0f, 0.0f);
     rec.material_index = -1;
 
-    // primitives.h alanları:
+    // primitives.h fields:
     rec.u = 0.0f;
     rec.v = 0.0f;
     rec.b0 = 0.0f;
@@ -24,8 +24,8 @@ static HitRecord no_hit_record(void) {
     return rec;
 }
 
-// primitives.h prototipleri void* olduğu için şimdilik "stub".
-// Sonra Plane/Cylinder/Box structlarını tanımlayıp gerçek hit fonksiyonlarını yazabiliriz.
+// primitives.h prototypes use void*, so these are stubs for now.
+// Later we can define Plane/Cylinder/Box structs and implement real hit functions.
 
 HitRecord hit_plane(void* pl, Ray r, float t_min, float t_max) {
     (void)pl; (void)r; (void)t_min; (void)t_max;

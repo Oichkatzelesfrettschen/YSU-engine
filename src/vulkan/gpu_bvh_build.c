@@ -117,7 +117,7 @@ static uint32_t build_node(
 
     nv->nodes[my_index].left  = (int32_t)L;
     nv->nodes[my_index].right = (int32_t)R;
-    // internal nodes: triOffset/triCount artık kullanılmayacak, ama debug için kalabilir
+    // internal nodes: triOffset/triCount no longer used, kept for debug
     nv->nodes[my_index].triOffset = -1;
     nv->nodes[my_index].triCount  = 0;
 
