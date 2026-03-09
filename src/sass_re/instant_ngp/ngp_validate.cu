@@ -25,6 +25,11 @@
 #define NGP_HASHMAP_SIZE    131072
 #define NGP_TOTAL_FEATURES  (NGP_NUM_LEVELS * NGP_FEATURES_PER)
 
+/* Catch size mismatches if either constant is changed without the other. */
+static_assert(NGP_TOTAL_FEATURES == NGP_NUM_LEVELS * NGP_FEATURES_PER,
+    "NGP_TOTAL_FEATURES mismatch — update both NGP_NUM_LEVELS and the caller "
+    "feature-buffer allocation together to avoid out-of-bounds writes");
+
 #define MLP_IN   27
 #define MLP_OUT  4
 #define MLP_HIDDEN 64
