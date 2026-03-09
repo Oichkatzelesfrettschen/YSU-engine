@@ -10,6 +10,16 @@ I reverse-engineered NVIDIA's Ada Lovelace GPU assembly (SASS), measured instruc
 
 **40K lines of C, zero frameworks** — CPU path tracer with adaptive sampling and deterministic RNG, Vulkan compute with 28 render modes and hybrid mesh+NeRF, RBMK-1000 nuclear reactor thermal simulation with real IAEA material correlations, quantum orbital raymarcher, Blender-style mesh editor. All from scratch.
 
+### Start here
+
+| If you want to... | Read this |
+|---|---|
+| Understand the SASS measurements | [`src/sass_re/RESULTS.md`](src/sass_re/RESULTS.md) |
+| Learn to read GPU assembly from scratch | [`LEARNING_GUIDE.md`](src/sass_re/instant_ngp/docs/LEARNING_GUIDE.md) |
+| See the optimized kernels + SASS diffs | [`src/sass_re/instant_ngp/`](src/sass_re/instant_ngp/) |
+| Reproduce the 3.16x benchmark | [`src/sass_re/instant_ngp/README.md`](src/sass_re/instant_ngp/README.md) |
+| Browse the full engine | [`src/`](src/) — start with [`render/render.c`](src/render/render.c) |
+
 ---
 
 ## SASS Reverse Engineering
@@ -36,7 +46,7 @@ Full results: [`src/sass_re/RESULTS.md`](src/sass_re/RESULTS.md)
 
 Three kernels rewritten in inline PTX to produce optimal SASS. Every instruction hand-chosen, every register allocation deliberate, verified by disassembly.
 
-| Kernel | Speedup vs nvcc | Key technique |
+| Kernel | Speedup vs nvcc -O2 | Key technique |
 |---|---|---|
 | **MLP Forward** (27→64→64→4) | **3.16x** | 8-wide ILP FFMA chains, shared mem weight tiling, FMNMX ReLU, MUFU sigmoid |
 | **Volume Rendering** | **1.53x** | MUFU.EX2 fast exp, predicated early exit, warp SHFL neighbor sharing |
@@ -44,9 +54,26 @@ Three kernels rewritten in inline PTX to produce optimal SASS. Every instruction
 
 The hash grid has a documented optimization journey: v1 used `asm volatile` everywhere and regressed to 0.69x (volatile barriers killed load/compute interleaving). v2 switched to non-volatile asm + pure C trilinear, reaching parity. v3 added float2 vectorized loads and software pipelining for the win.
 
-**Three-tier docs** — written so anyone can learn from this work:
+### Why 3.16x over -O2 is real
+
+The MLP kernel is compute-bound (6,249 FFMA instructions). The compiler generates sequential accumulator chains — it doesn't know the dot product has 8 independent lanes it can overlap. The hand-written version keeps 8 FFMA accumulators in flight simultaneously, saturating the FP32 pipeline. Shared memory weight tiling eliminates redundant global loads. FMNMX replaces a branch-based ReLU. These aren't tricks — they're what an engineer would do if they could see the assembly, which is exactly what this project enables.
+
+The reference kernels are plain CUDA compiled with `nvcc -arch=sm_89 -O2`. No `-O0`, no strawman. You can read the reference code, read the PTX code, and diff the SASS yourself — everything is in [`src/sass_re/instant_ngp/`](src/sass_re/instant_ngp/).
+
+### Reproduce it yourself
+
+```powershell
+cd src/sass_re/instant_ngp
+powershell -ExecutionPolicy Bypass -File build_and_verify.ps1
+```
+
+This compiles both reference and PTX kernels, validates correctness (MLP max error: 1.19e-07), and prints wall-clock speedups. Requires CUDA 13.x and an SM 7.5+ GPU. Tested on RTX 4070 Ti Super — should show similar ratios on any Ada/Ampere/Turing card since the wins are architectural (ILP, memory access pattern), not clock-speed dependent.
+
+### Learn from it
+
+Three-tier docs — written so anyone can learn from this work:
 - [Explained for Everyone](src/sass_re/instant_ngp/docs/EXPLAINED_FOR_EVERYONE.md) — no CS background needed
-- [Learning Guide](src/sass_re/instant_ngp/docs/LEARNING_GUIDE.md) — teaches you to read SASS from scratch, with real instructions decoded step by step
+- [Learning Guide](src/sass_re/instant_ngp/docs/LEARNING_GUIDE.md) — teaches you to read SASS from scratch, with 5 real instructions decoded step by step
 - [Technical Reference](src/sass_re/instant_ngp/docs/TECHNICAL_REFERENCE.md) — register counts, SASS diffs, architecture-specific details
 
 ---
@@ -160,6 +187,16 @@ scripts/       — build, test, and analysis scripts
 ## License
 
 MIT
+
+## Contact & Collaboration
+
+I'm looking for:
+
+- **A Blackwell GPU (RTX 5080 Ti / B200)** to extend the SASS measurements to SM 10.0. The multi-arch pipeline is already built — I just need the hardware. If you have one gathering dust or can lend cloud access, the comparison paper writes itself.
+- **Code review from GPU engineers** — if you work on compiler backends, ISA design, or neural graphics and see something wrong (or right) in the SASS analysis, I want to hear it.
+- **Collaboration on kernel optimization** — the methodology generalizes beyond Instant-NGP. Any memory-bound or compute-bound CUDA kernel can be profiled with this toolkit and hand-tuned the same way.
+
+Reach me at: **umutkorkmaz.dev@gmail.com** · [GitHub Issues](https://github.com/ismail0098-lang/YSU-engine/issues)
 
 ## Author
 
