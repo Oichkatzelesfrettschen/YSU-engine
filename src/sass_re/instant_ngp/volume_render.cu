@@ -253,7 +253,14 @@ nerf_render_fused_ptx(
     float acc_r = 0.0f, acc_g = 0.0f, acc_b = 0.0f;
     float T = 1.0f;
 
-    float t = t_min;
+    /* Midpoint sampling: place first sample at t_min + 0.5*dt, then advance
+     * by dt each step.  This avoids a half-step bias at the near plane that
+     * would occur if every sample were at the cell edge (t_min, t_min+dt, …).
+     * Using an FMA keeps the computation in a single PTX instruction. */
+    float t;
+    asm volatile("fma.rn.f32 %0, %1, 0f3F000000, %2;"
+                 : "=f"(t) : "f"(dt), "f"(t_min));
+    /* t = t_min + 0.5f * dt  (0f3F000000 = 0.5 in IEEE-754) */
 
     for (int step = 0; step < num_steps; step++) {
         /* Compute sample position: pos = origin + t * dir

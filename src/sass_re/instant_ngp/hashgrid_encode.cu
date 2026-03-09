@@ -58,6 +58,14 @@
 #define NGP_PER_LEVEL_SCALE 1.5f
 #define NGP_TOTAL_FEATURES  (NGP_NUM_LEVELS * NGP_FEATURES_PER)  /* 24 */
 
+/* Safety: if NGP_NUM_LEVELS is ever changed the caller's feature buffer must
+ * be resized to N * NGP_TOTAL_FEATURES floats.  Catch mismatches at compile
+ * time.  If you see this assertion, update NGP_TOTAL_FEATURES or the buffer
+ * allocation in the caller to match NGP_NUM_LEVELS * NGP_FEATURES_PER. */
+static_assert(NGP_TOTAL_FEATURES == NGP_NUM_LEVELS * NGP_FEATURES_PER,
+    "NGP_TOTAL_FEATURES must equal NGP_NUM_LEVELS * NGP_FEATURES_PER — "
+    "update both together to avoid out-of-bounds writes into feature buffers");
+
 /* Spatial hash primes (same as engine's ysu_hash_ijk) */
 #define PRIME_X 73856093u
 #define PRIME_Y 19349663u

@@ -288,7 +288,20 @@ NeRFData* ysu_nerf_data_load(const char *hashgrid_path, const char *occ_path) {
     }
     free(grid_raw);
 
-    /* MLP sizes */
+    /* MLP sizes
+     * WEIGHT LAYOUT NOTE: this CPU inference path stores W0 as
+     * [in_dim][hidden_dim] = [27][64] (row-major, outer index = input feature).
+     * The GPU kernel in src/sass_re/instant_ngp/mlp_forward.cu stores W0 as
+     * [hidden_dim][in_dim] = [64][27] (outer index = neuron).
+     * These are TRANSPOSED from each other — GPU-trained checkpoints cannot
+     * be loaded here without transposing W0 and W1 first.
+     * Set env var YSU_NERF_GPU_WEIGHTS=1 to emit a reminder at load time. */
+    if (getenv("YSU_NERF_GPU_WEIGHTS")) {
+        fprintf(stderr,
+            "[NeRF] WARNING: YSU_NERF_GPU_WEIGHTS set. GPU checkpoints store W0 as\n"
+            "  [hidden][in]=[64][27]. This CPU code expects [in][hidden]=[27][64].\n"
+            "  Transpose W0 and W1 before loading, or results will be wrong.\n");
+    }
     uint32_t w0_size = data->config.mlp_hidden_dim * data->config.mlp_in_dim;
     uint32_t b0_size = data->config.mlp_hidden_dim;
     uint32_t w1_size = data->config.mlp_hidden_dim * data->config.mlp_hidden_dim;
@@ -529,7 +542,9 @@ void ysu_mlp_inference_batch(
     /* Hidden layer output [8 rays][hidden_dim] */
     float hidden[SIMD_BATCH_SIZE][128];
     
-    /* Get weight pointers — layout is [in_dim][hidden_dim] (row-major) */
+    /* Get weight pointers — layout is [in_dim][hidden_dim] (row-major, CPU convention).
+     * NOTE: the GPU kernel (mlp_forward.cu) uses [hidden_dim][in_dim] — TRANSPOSED.
+     * Weights loaded from .ysub files use this CPU [in][hidden] layout. */
     const float *w0 = mlp_weights;
     const float *b0 = mlp_biases;
     const float *w1 = w0 + hidden_dim * in_dim;

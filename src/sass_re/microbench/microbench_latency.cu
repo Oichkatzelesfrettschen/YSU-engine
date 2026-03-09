@@ -252,8 +252,10 @@ k_shfl(volatile int *sink, volatile long long *out) {
         x = __shfl_xor(x, 1);
 #endif
     asm volatile("mov.u64 %0, %%clock64;" : "=l"(t1));
-    sink[3] = x;   /* keep live */
-    if (threadIdx.x == 0) { out[0] = t1 - t0; out[1] = N; }
+    if (threadIdx.x == 0) {
+        sink[3] = x;   /* keep chain live — single writer avoids data race */
+        out[0] = t1 - t0; out[1] = N;
+    }
 }
 
 /* ── LDG pointer chase ─────────────────────────────── */
@@ -391,7 +393,11 @@ int main() {
     /* LDG chase */
     {
         int *d_chase, hc[1024];
-        for (int i = 0; i < 1024; i++) hc[i] = (i+1)%1024;
+        /* Stride-by-97 permutation (gcd(97,1024)==1 → visits all 1024 slots)
+         * avoids sequential accesses that the HW prefetcher can pipeline,
+         * which would under-report true LDG latency.  The non-power-of-2
+         * stride defeats stride-prefetching heuristics. */
+        for (int i = 0; i < 1024; i++) hc[i] = (int)(((unsigned)i * 97u + 1u) % 1024u);
         CHECK(cudaMalloc(&d_chase, sizeof(hc)));
         CHECK(cudaMemcpy(d_chase, hc, sizeof(hc), cudaMemcpyHostToDevice));
         k_ldg<<<1,32>>>(d_out, d_chase); cudaDeviceSynchronize();
