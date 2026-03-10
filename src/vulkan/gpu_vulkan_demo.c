@@ -1,4 +1,9 @@
-#define VK_USE_PLATFORM_WIN32_KHR
+#ifdef _WIN32
+    #define VK_USE_PLATFORM_WIN32_KHR
+#elif defined(__linux__)
+    #define VK_USE_PLATFORM_XLIB_KHR
+#endif
+
 #include "gpu_bvh_lbv.h"
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
