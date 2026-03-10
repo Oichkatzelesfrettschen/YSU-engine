@@ -116,10 +116,12 @@ static GLFWwindow     *g_window   = NULL;
 
 /* ── DLSS Temporal Super-Resolution state ── */
 static int              g_dlss_enabled = 0;
-static int              g_dlss_active  = 0;
 static int              g_dlss_quality = 2;  /* YSU_UPSCALE_QUALITY_BALANCED */
 static int              g_W_lo = 0, g_H_lo = 0;
 static int              g_W_hi = 0, g_H_hi = 0;
+
+#ifdef QV_ENABLE_WINDOW
+static int              g_dlss_active  = 0;
 static YsuUpscaleCtx    g_upscale;
 static int              g_upscale_inited = 0;
 
@@ -166,6 +168,7 @@ typedef struct {
     float sigma_s, sigma_r;
     int pad0, pad1;
 } DenoisePushConst;
+#endif /* QV_ENABLE_WINDOW */
 
 static int init_vulkan(int windowed) {
     VkApplicationInfo app = {VK_STRUCTURE_TYPE_APPLICATION_INFO};

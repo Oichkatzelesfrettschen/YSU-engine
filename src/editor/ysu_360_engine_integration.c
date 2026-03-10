@@ -98,7 +98,7 @@ static inline float ysu_rng_f01(YSU_Rng *r) {
 }
 
 // ------------------------- mapping (x,y) -> ray dir -------------------------
-static Vec3 ysu_dir_from_equirect(int x, int y, int w, int h) {
+static __attribute__((unused)) Vec3 ysu_dir_from_equirect(int x, int y, int w, int h) {
     // x: [0,w) -> phi in [0,2pi)
     // y: [0,h) -> theta in [0,pi]
     float u = ((float)x + 0.5f) / (float)w;

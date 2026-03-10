@@ -33,12 +33,14 @@ static float nr_rand01(void) {
     return (float)((nr_seed >> 16) & 0x7FFF) / 32768.0f;
 }
 
+#if 0 /* reserved for future stochastic simulation */
 static float nr_randn(void) {
     /* Box-Muller */
     float u1 = nr_rand01() + 1e-7f;
     float u2 = nr_rand01();
     return sqrtf(-2.0f * logf(u1)) * cosf(6.2832f * u2);
 }
+#endif
 
 /* ═══════════════════════ PHASE TIMING ═══════════════════════ */
 /* Cumulative end-times for each phase, per reaction type. */

@@ -527,7 +527,7 @@ static void render_tile_chunk(RenderPool *p, WorkerLocal *wl, int job) {
                                    ^ (uint32_t)(job * 0xA511E9B3u));
     if (tile_base == 0u) tile_base = 1u;
 
-    YSU_Rng rng;
+    YSU_Rng rng = {0};
 
     for (int j = y0; j < y1; ++j) {
         Vec3* row = p->pixels + (p->height - 1 - j) * p->width;

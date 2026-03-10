@@ -450,10 +450,10 @@ VkResult ysu_upscale_load_weights(YsuUpscaleCtx* ctx, const char* path) {
 
     /* Prefer host-visible + device-local (BAR / ReBAR) for simple upload.
      * Fall back to host-visible only. In production, use a staging buffer. */
-    VkPhysicalDevice pd = VK_NULL_HANDLE; /* We stored it... actually we didn't. workaround below */
+    VkPhysicalDevice pd __attribute__((unused)) = VK_NULL_HANDLE; /* We stored it... actually we didn't. workaround below */
     /* NOTE: For a complete implementation, store phys_device in ctx.
      * Here we use HOST_VISIBLE | HOST_COHERENT as a portable choice.    */
-    VkPhysicalDeviceMemoryProperties memProps;
+    VkPhysicalDeviceMemoryProperties memProps __attribute__((unused));
     /* We can't call vkGetPhysicalDeviceMemoryProperties without physDevice.
      * In practice the caller should use a staging buffer. For simplicity,
      * we provide a HOST_VISIBLE path: */
@@ -488,7 +488,7 @@ VkResult ysu_upscale_load_weights(YsuUpscaleCtx* ctx, const char* path) {
  *  Transition helper (undefined → general)
  * ═══════════════════════════════════════════════════════════════════ */
 
-static void ysu_transition_image(VkCommandBuffer cmd, VkImage img,
+static __attribute__((unused)) void ysu_transition_image(VkCommandBuffer cmd, VkImage img,
                                  VkImageLayout oldLayout, VkImageLayout newLayout,
                                  VkAccessFlags srcAccess, VkAccessFlags dstAccess,
                                  VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage)

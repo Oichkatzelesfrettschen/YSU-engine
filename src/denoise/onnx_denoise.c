@@ -6,7 +6,6 @@
 
 #ifdef YSU_HAVE_ONNX
 #include "onnxruntime_c_api.h"   // third_party/onnxruntime/include
-#endif
 
 static int ysu_env_int(const char *name, int defv) {
     const char *s = getenv(name);
@@ -54,7 +53,6 @@ static void nchw_to_pixels(const float *src, Vec3 *pixels, int w, int h) {
     }
 }
 
-#ifdef YSU_HAVE_ONNX
 void ysu_neural_denoise_maybe(Vec3 *pixels, int width, int height)
 {
     if (!pixels || width <= 0 || height <= 0) return;

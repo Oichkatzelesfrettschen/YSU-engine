@@ -39,7 +39,6 @@ static uint32_t nv_push(NodeVec* nv, const GPUBVHNode* n){
 
 static int g_sort_axis = 0;
 static const TriInfo* g_tri = NULL;
-static const int32_t* g_idx = NULL;
 
 static int cmp_centroid(const void* a, const void* b){
     int32_t ia = *(const int32_t*)a;

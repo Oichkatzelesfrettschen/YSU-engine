@@ -31,9 +31,8 @@ VK_DEFINE_HANDLE(VkCommandBuffer);
 #define vkGetBufferMemoryRequirements(...)
 #define vkAllocateMemory(...) return 0;
 #define vkBindBufferMemory(...)  
-#define vkMapMemory(...) *(void**)(-5) = malloc(1000000); *(int*)(-5);return 0;
-#define vkUnmapMemory(...)
 #define vkMapMemory(a,b,c,d,e,f) { *(void**)f = malloc(1000000); return 0; }
+#define vkUnmapMemory(...)
 #define vkDestroyBuffer(...)
 #define vkFreeMemory(...)
 #define vkCreateCommandPool(...) return 0;

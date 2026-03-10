@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <cpuid.h>
 #ifdef _OPENMP
 #include <omp.h>
@@ -127,7 +128,6 @@ static inline uint64_t ysu_rdtsc(void) {
 static inline __m256 ysu_sigmoid_avx2(__m256 x) {
     /* sigmoid(x) = 1 / (1 + exp(-x)) - Fast approximation */
     const __m256 one = _mm256_set1_ps(1.0f);
-    const __m256 neg_one = _mm256_set1_ps(-1.0f);
     
     /* Fast sigmoid approximation: clamp(0.5 + 0.2 * x, 0, 1) */
     __m256 sigmoid_approx = _mm256_mul_ps(x, _mm256_set1_ps(0.2f));
@@ -232,15 +232,15 @@ NeRFData* ysu_nerf_data_load(const char *hashgrid_path, const char *occ_path) {
     data->config.features_per_entry = header[3];
     data->config.hashmap_size = header[4];
     data->config.base_res = header[5];
-    data->config.per_level_scale = *(float*)&header[6];
+    memcpy(&data->config.per_level_scale, &header[6], sizeof(float));
     data->config.mlp_in_dim = header[7];
     data->config.mlp_hidden_dim = header[8];
     data->config.mlp_num_layers = header[9];
     data->config.mlp_out_dim = header[10];
-    data->config.scale = *(float*)&header[11];
-    data->config.center.x = *(float*)&header[12];
-    data->config.center.y = *(float*)&header[13];
-    data->config.center.z = *(float*)&header[14];
+    memcpy(&data->config.scale, &header[11], sizeof(float));
+    memcpy(&data->config.center.x, &header[12], sizeof(float));
+    memcpy(&data->config.center.y, &header[13], sizeof(float));
+    memcpy(&data->config.center.z, &header[14], sizeof(float));
 
     bool fp16_format = data->config.version >= 2;
 
@@ -1065,6 +1065,6 @@ void ysu_perf_report(const char *name, const PerfCounter *counter) {
     double avg_cycles = (double)counter->total_cycles / counter->sample_count;
     double avg_us = avg_cycles / 3000.0;  /* ~3 GHz CPU */
     
-    printf("[PERF] %s: %.2f cycles/sample, %.2f µs/sample (%lu samples)\n",
+    printf("[PERF] %s: %.2f cycles/sample, %.2f µs/sample (%" PRIu64 " samples)\n",
            name, avg_cycles, avg_us, counter->sample_count);
 }

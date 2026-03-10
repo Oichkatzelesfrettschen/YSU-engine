@@ -547,7 +547,6 @@ static void update_coolant(ReactorThermal *rt) {
     int G = rt->gridDim;
     float h = rt->boxHalf;
     float dx = 2.0f * h / (float)G;
-    float dt = rt->dt;
     float P = rt->system_pressure;
 
     float T_sat = rt_saturation_temp(P);
@@ -708,10 +707,9 @@ static void update_zr_oxidation(ReactorThermal *rt) {
         if (rt->material_id[idx] != RT_MAT_CLAD_ZR4) continue;
 
         float T = rt->temperature[idx];
-        if (T < 1073.15f) continue; /* Below ~800°C: negligible oxidation */
+        if (T < 1073.15f) continue;
 
         /* Baker-Just parabolic rate */
-        float K = rt_zr_oxidation_rate(T);
         float surface_area = 6.0f * powf(cell_vol, 2.0f / 3.0f); /* simplified cell surface */
 
         /* Mass of H₂ produced per cell per dt */
@@ -1165,7 +1163,6 @@ int reactor_thermal_init(ReactorThermal *rt,
     {
         float phi_nom = 3.0e13f;  /* nominal full-power thermal flux */
         float phi = phi_nom * rt->power_fraction;
-        float sigma_f_phi = RT_SIGMA_F_U235 * phi;  /* proxy for Σ_f·φ per atom */
         /* Use a simplified macroscopic production rate proportional to power */
         float fiss_rate = 9.8e13f * rt->power_fraction; /* fissions/cm³/s at power */
 
@@ -1554,9 +1551,12 @@ static void update_neutrons(ReactorThermal *rt) {
         int ix = (int)((n->x + h) / dx);
         int iy = (int)((n->y + h) / dx);
         int iz = (int)((n->z + h) / dx);
-        if (ix < 0) ix = 0; if (ix >= G) ix = G - 1;
-        if (iy < 0) iy = 0; if (iy >= G) iy = G - 1;
-        if (iz < 0) iz = 0; if (iz >= G) iz = G - 1;
+        if (ix < 0) ix = 0;
+        if (ix >= G) ix = G - 1;
+        if (iy < 0) iy = 0;
+        if (iy >= G) iy = G - 1;
+        if (iz < 0) iz = 0;
+        if (iz >= G) iz = G - 1;
         int idx = iz * G * G + iy * G + ix;
         int mat = rt->material_id[idx];
 
@@ -1778,7 +1778,6 @@ int reactor_thermal_gpu_diffuse(ReactorThermal *rt, VkQueue queue, int nIteratio
     rt_submit_and_wait(dev, queue, rt->cmdBuf);
 
     /* Readback: result is in tempBuf or tempBuf2 depending on parity */
-    VkBuffer resultBuf = (nIterations % 2 == 0) ? rt->tempBuf : rt->tempBuf2;
     VkDeviceMemory resultMem = (nIterations % 2 == 0) ? rt->tempMem : rt->tempMem2;
     vkMapMemory(dev, resultMem, 0, grid_size, 0, &mapped);
     memcpy(rt->temperature, mapped, (size_t)grid_size);
@@ -1804,7 +1803,6 @@ int reactor_thermal_visualize(ReactorThermal *rt, VkQueue queue) {
     /* Resample thermal grid (64³) → visualization grid (128³) */
     int G_src = rt->gridDim;        /* 64 */
     int G_dst = rt->visGridDim;     /* 128 */
-    float h_src = rt->boxHalf;      /* 7.0 m */
 
     for (int dz = 0; dz < G_dst; dz++) {
         for (int dy = 0; dy < G_dst; dy++) {

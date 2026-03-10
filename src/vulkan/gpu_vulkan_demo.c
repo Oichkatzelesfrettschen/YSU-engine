@@ -2177,14 +2177,11 @@ if(window_enabled && surface!=VK_NULL_HANDLE){
 
     // ---------- Optional GPU denoiser (separable bilateral filter) ----------
     VkShaderModule sm_denoise = VK_NULL_HANDLE;
-    VkShaderModule sm_blend = VK_NULL_HANDLE;  // temporal blend shader
     VkPipelineLayout pl_denoise = VK_NULL_HANDLE;
     VkDescriptorSetLayout dsl_denoise = VK_NULL_HANDLE;
     VkDescriptorPool dp_denoise = VK_NULL_HANDLE;
     VkDescriptorSet ds_denoise_h = VK_NULL_HANDLE;  // horizontal pass
     VkDescriptorSet ds_denoise_v = VK_NULL_HANDLE;  // vertical pass
-    VkDescriptorPool dp_blend = VK_NULL_HANDLE;     // temporal blend descriptor pool
-    VkDescriptorSet ds_blend = VK_NULL_HANDLE;      // temporal blend descriptor set
     VkImage denoise_temp = VK_NULL_HANDLE;          // temporary image for 2-pass filter
     VkDeviceMemory denoise_temp_mem = VK_NULL_HANDLE;
     VkImageView denoise_temp_view = VK_NULL_HANDLE;
@@ -2192,7 +2189,6 @@ if(window_enabled && surface!=VK_NULL_HANDLE){
     VkDeviceMemory denoise_history_mem = VK_NULL_HANDLE;
     VkImageView denoise_history_view = VK_NULL_HANDLE;
     VkPipeline pipe_denoise = VK_NULL_HANDLE;
-    VkPipeline pipe_blend = VK_NULL_HANDLE;  // temporal blend pipeline
     
     int gpu_denoise_enabled = ysu_env_bool("YSU_GPU_DENOISE", 0);
     int denoise_radius = ysu_env_int("YSU_GPU_DENOISE_RADIUS", fast_mode ? 1 : 3);
@@ -3157,7 +3153,7 @@ if(window_enabled && surface!=VK_NULL_HANDLE){
                 } else {
                     if(tonemap_enabled){
                         const uint8_t* px8 = (const uint8_t*)dump_map;
-                        for(int i=0;i<dump_w*dump_h;i++){
+                        for(uint32_t i=0;i<dump_w*dump_h;i++){
                             // ldr_img uses RGBA8 format
                             pixels_cpu[i].x = (float)(px8[i*4 + 0]) / 255.0f;  // R
                             pixels_cpu[i].y = (float)(px8[i*4 + 1]) / 255.0f;  // G
@@ -3165,13 +3161,16 @@ if(window_enabled && surface!=VK_NULL_HANDLE){
                         }
                     } else {
                         const float* px = (const float*)dump_map;
-                        for(int i=0;i<dump_w*dump_h;i++){
+                        for(uint32_t i=0;i<dump_w*dump_h;i++){
                             pixels_cpu[i].x = px[i*4 + 0];
                             pixels_cpu[i].y = px[i*4 + 1];
                             pixels_cpu[i].z = px[i*4 + 2];
-                            if(pixels_cpu[i].x < 0) pixels_cpu[i].x = 0; if(pixels_cpu[i].x > 1) pixels_cpu[i].x = 1;
-                            if(pixels_cpu[i].y < 0) pixels_cpu[i].y = 0; if(pixels_cpu[i].y > 1) pixels_cpu[i].y = 1;
-                            if(pixels_cpu[i].z < 0) pixels_cpu[i].z = 0; if(pixels_cpu[i].z > 1) pixels_cpu[i].z = 1;
+                            if(pixels_cpu[i].x < 0) pixels_cpu[i].x = 0;
+                            if(pixels_cpu[i].x > 1) pixels_cpu[i].x = 1;
+                            if(pixels_cpu[i].y < 0) pixels_cpu[i].y = 0;
+                            if(pixels_cpu[i].y > 1) pixels_cpu[i].y = 1;
+                            if(pixels_cpu[i].z < 0) pixels_cpu[i].z = 0;
+                            if(pixels_cpu[i].z > 1) pixels_cpu[i].z = 1;
                         }
                     }
 
@@ -3180,13 +3179,17 @@ if(window_enabled && surface!=VK_NULL_HANDLE){
 
                     // Write denoised pixels
                     fprintf(outf, "P6\n%d %d\n255\n", dump_w, dump_h);
-                    for(int i=0;i<dump_w*dump_h;i++){
+                    for(uint32_t i=0;i<dump_w*dump_h;i++){
                         unsigned char rgb[3];
                         float r = pixels_cpu[i].x;
                         float g = pixels_cpu[i].y;
                         float b = pixels_cpu[i].z;
-                        if(r < 0) r = 0; if(g < 0) g = 0; if(b < 0) b = 0;
-                        if(r > 1) r = 1; if(g > 1) g = 1; if(b > 1) b = 1;
+                        if(r < 0) r = 0;
+                        if(g < 0) g = 0;
+                        if(b < 0) b = 0;
+                        if(r > 1) r = 1;
+                        if(g > 1) g = 1;
+                        if(b > 1) b = 1;
                         rgb[0] = (unsigned char)(255.0f * r);
                         rgb[1] = (unsigned char)(255.0f * g);
                         rgb[2] = (unsigned char)(255.0f * b);
@@ -3658,9 +3661,12 @@ if(window_enabled && surface!=VK_NULL_HANDLE){
                 pixels_cpu[i].y = px[i*4 + 1];
                 pixels_cpu[i].z = px[i*4 + 2];
                 // Clamp to [0,1]
-                if(pixels_cpu[i].x < 0) pixels_cpu[i].x = 0; if(pixels_cpu[i].x > 1) pixels_cpu[i].x = 1;
-                if(pixels_cpu[i].y < 0) pixels_cpu[i].y = 0; if(pixels_cpu[i].y > 1) pixels_cpu[i].y = 1;
-                if(pixels_cpu[i].z < 0) pixels_cpu[i].z = 0; if(pixels_cpu[i].z > 1) pixels_cpu[i].z = 1;
+                if(pixels_cpu[i].x < 0) pixels_cpu[i].x = 0;
+                if(pixels_cpu[i].x > 1) pixels_cpu[i].x = 1;
+                if(pixels_cpu[i].y < 0) pixels_cpu[i].y = 0;
+                if(pixels_cpu[i].y > 1) pixels_cpu[i].y = 1;
+                if(pixels_cpu[i].z < 0) pixels_cpu[i].z = 0;
+                if(pixels_cpu[i].z > 1) pixels_cpu[i].z = 1;
             }
         }
 
@@ -3673,8 +3679,12 @@ if(window_enabled && surface!=VK_NULL_HANDLE){
             float r = pixels_cpu[i].x;
             float g = pixels_cpu[i].y;
             float b = pixels_cpu[i].z;
-            if(r < 0) r = 0; if(g < 0) g = 0; if(b < 0) b = 0;
-            if(r > 1) r = 1; if(g > 1) g = 1; if(b > 1) b = 1;
+            if(r < 0) r = 0;
+            if(g < 0) g = 0;
+            if(b < 0) b = 0;
+            if(r > 1) r = 1;
+            if(g > 1) g = 1;
+            if(b > 1) b = 1;
             rgb[0] = (unsigned char)(255.0f * r);
             rgb[1] = (unsigned char)(255.0f * g);
             rgb[2] = (unsigned char)(255.0f * b);
@@ -3724,7 +3734,6 @@ if(window_enabled && surface!=VK_NULL_HANDLE){
     if(qp_ts!=VK_NULL_HANDLE) vkDestroyQueryPool(dev, qp_ts, NULL);
     }
 
-cleanup:
     vkDestroyBuffer(dev, ctr_buf, NULL);
     vkFreeMemory(dev, ctr_mem, NULL);
 

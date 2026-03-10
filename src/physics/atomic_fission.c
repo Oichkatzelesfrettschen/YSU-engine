@@ -63,7 +63,7 @@ static float atom_radius_A(int Z) {
 }
 
 /* Nuclear radius in fm: R = 1.25 Ã— A^(1/3) */
-static float nuclear_radius_fm(int A) {
+static __attribute__((unused)) float nuclear_radius_fm(int A) {
     return AF_R0_FM * cbrtf((float)A);
 }
 
@@ -77,7 +77,7 @@ static float neutron_wavelength_A(float energy_eV) {
 
 /* Speed of neutron at given energy: v = âˆš(2E/m)
  * For display purposes, scaled dramatically (actual thermal = 2200 m/s = tiny) */
-static float neutron_speed_display(float energy_eV) {
+static __attribute__((unused)) float neutron_speed_display(float energy_eV) {
     /* Scale so thermal neutrons cross ~20 Ã… in ~2 seconds (human-visible speed) */
     float v_real = sqrtf(2.0f * energy_eV * 1.602e-19f / 1.675e-27f); /* m/s */
     /* Map to display: 1 Ã…/s per 100 m/s real */

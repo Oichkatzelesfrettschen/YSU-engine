@@ -478,7 +478,6 @@ void depth_prepass_compute(
     }
     
     // Compute statistics
-    uint64_t total = out_hints->hits + out_hints->misses;
     if (out_hints->hits > 0) {
         out_hints->avg_depth = (float)(depth_sum / out_hints->hits);
         double variance = (depth_sq_sum / out_hints->hits) - (out_hints->avg_depth * out_hints->avg_depth);
@@ -621,11 +620,16 @@ void depth_prepass_compute_mt(
     }
     
 #ifdef _WIN32
-    HANDLE* threads = (HANDLE*)malloc(num_threads * sizeof(HANDLE));
+    HANDLE* threads = NULL;
+    threads = (HANDLE*)malloc(num_threads * sizeof(HANDLE));
+    if (!threads) { free(tasks); return; }
     for (int i = 0; i < num_threads; i++) {
         threads[i] = CreateThread(NULL, 0, prepass_thread_func, &tasks[i], 0, NULL);
     }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     WaitForMultipleObjects(num_threads, threads, TRUE, INFINITE);
+#pragma GCC diagnostic pop
     for (int i = 0; i < num_threads; i++) {
         CloseHandle(threads[i]);
     }
@@ -656,13 +660,15 @@ void depth_prepass_compute_mt(
 // Proxy Mesh from Occupancy Grid (Marching Cubes - Simplified)
 // ============================================================================
 
-// Marching cubes edge table (simplified)
+// Marching cubes edge table - reserved for future MC implementation
+#if 0
 static const int MC_EDGE_TABLE[256] = {
     0x0, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
     0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
     // ... (full table would be 256 entries, simplified for brevity)
     // Using a simplified version that generates adequate proxy geometry
 };
+#endif
 
 // Simplified marching cubes - generate box per occupied voxel
 int proxy_mesh_from_occupancy(

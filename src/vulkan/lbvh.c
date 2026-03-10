@@ -181,12 +181,18 @@ bvh_node* lbvh_build(void* triangles, int tri_count, int tri_size) {
         
         // Compute bounds
         Vec3 bmin = p0, bmax = p0;
-        if (p1.x < bmin.x) bmin.x = p1.x; if (p1.x > bmax.x) bmax.x = p1.x;
-        if (p1.y < bmin.y) bmin.y = p1.y; if (p1.y > bmax.y) bmax.y = p1.y;
-        if (p1.z < bmin.z) bmin.z = p1.z; if (p1.z > bmax.z) bmax.z = p1.z;
-        if (p2.x < bmin.x) bmin.x = p2.x; if (p2.x > bmax.x) bmax.x = p2.x;
-        if (p2.y < bmin.y) bmin.y = p2.y; if (p2.y > bmax.y) bmax.y = p2.y;
-        if (p2.z < bmin.z) bmin.z = p2.z; if (p2.z > bmax.z) bmax.z = p2.z;
+        if (p1.x < bmin.x) bmin.x = p1.x;
+        if (p1.x > bmax.x) bmax.x = p1.x;
+        if (p1.y < bmin.y) bmin.y = p1.y;
+        if (p1.y > bmax.y) bmax.y = p1.y;
+        if (p1.z < bmin.z) bmin.z = p1.z;
+        if (p1.z > bmax.z) bmax.z = p1.z;
+        if (p2.x < bmin.x) bmin.x = p2.x;
+        if (p2.x > bmax.x) bmax.x = p2.x;
+        if (p2.y < bmin.y) bmin.y = p2.y;
+        if (p2.y > bmax.y) bmax.y = p2.y;
+        if (p2.z < bmin.z) bmin.z = p2.z;
+        if (p2.z > bmax.z) bmax.z = p2.z;
         
         prims[i].bounds.minimum = bmin;
         prims[i].bounds.maximum = bmax;

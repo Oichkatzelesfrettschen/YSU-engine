@@ -279,7 +279,7 @@ static int bvh_count_pruned_rec(const bvh_node* n) {
 #define YSU_POLICY_PHYSICAL_PRUNE 0
 #endif
 
-static void bvh_prune_subtrees_inplace(bvh_node* n) {
+static __attribute__((unused)) void bvh_prune_subtrees_inplace(bvh_node* n) {
     if (!n) return;
 
     if (n->prune) {
