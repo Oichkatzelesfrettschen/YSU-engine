@@ -10,12 +10,13 @@
 2. [Why GPUs Are Different (And Why That Matters)](#why-gpus-are-different)
 3. [The Memory Problem: Why Fast Code Is Hard](#the-memory-problem)
 4. [Reading Real SASS: A Guided Tour](#reading-real-sass-a-guided-tour)
-5. [The NeRF Pipeline](#the-nerf-pipeline)
-6. [Kernel 1: Hash Grid Encoding — Deep Dive](#kernel-1-hash-grid-encoding)
-7. [Kernel 2: MLP Forward Pass — Deep Dive](#kernel-2-mlp-forward-pass)
-8. [Kernel 3: Volume Rendering — Deep Dive](#kernel-3-volume-rendering)
-9. [How to Think About Performance](#how-to-think-about-performance)
-10. [Key Concepts Glossary](#key-concepts-glossary)
+5. [SASS Control Codes: The Hidden Instruction Fields](#sass-control-codes-the-hidden-instruction-fields)
+6. [The NeRF Pipeline](#the-nerf-pipeline)
+7. [Kernel 1: Hash Grid Encoding — Deep Dive](#kernel-1-hash-grid-encoding)
+8. [Kernel 2: MLP Forward Pass — Deep Dive](#kernel-2-mlp-forward-pass)
+9. [Kernel 3: Volume Rendering — Deep Dive](#kernel-3-volume-rendering)
+10. [How to Think About Performance](#how-to-think-about-performance)
+11. [Key Concepts Glossary](#key-concepts-glossary)
 
 ---
 
@@ -336,6 +337,168 @@ This is our **early exit**: "If transmittance < 0.001, skip to the end." Predica
 | **SHF** | Funnel shift (bit manipulation) | ~4 cycles | Address computation |
 | **F2I** | Float → integer conversion | ~4 cycles | Grid coordinate floor |
 | **SELP** | Select based on predicate | ~4 cycles | Conditional value pick |
+
+---
+
+## SASS Control Codes: The Hidden Instruction Fields
+
+Every SASS instruction you see in `cuobjdump` output has a partner: a **control word** printed right below it. Most tutorials skip this entirely. That's a mistake — the control word is where the warp scheduler gets its orders.
+
+```
+/*0090*/    FFMA R8, R12, R5, R8;    /* 0x0000000500087423 */
+                                      /* 0x004fe4000000000f */
+```
+
+See that second hex line? That's the control word. It encodes four pieces of information:
+
+| Field | What it controls | Quick summary |
+|-------|-----------------|---------------|
+| **Stall cycles** | How many cycles to wait before the next instruction | Encodes producer latency |
+| **Yield flag** | Should this warp yield to another? | Enables latency hiding |
+| **Dependency barriers** | Which hazards does this instruction create or clear? | Prevents read-before-write |
+| **Reuse flags** | Which operands should be cached for the next instruction? | Saves register file reads |
+
+The compiler (`ptxas`) writes these fields automatically. When you're doing GPU assembly optimization — or just reading SASS to understand performance — these fields tell you *how well the scheduler is handling your code*.
+
+---
+
+### Stall Cycles
+
+**What they are:** A 4–5 bit counter in the control word, value 0–15. It tells the warp scheduler: **"Wait this many cycles after issuing this instruction before issuing the next one."**
+
+**Why they exist:** GPU instructions are pipelined — they take several cycles to produce a result. The scheduler can technically *issue* a new instruction every cycle. Without stall counts, it might issue a consumer instruction before the producer has finished writing its result. Stall counts prevent that.
+
+Think of it like a recipe:
+
+> "Put the bread dough in the mixer. *Wait 10 minutes.* Shape the dough."
+
+The "wait 10 minutes" is the stall cycle count. You have to tell it explicitly; the hardware won't guess.
+
+**What the numbers mean:**
+
+| Instruction | Typical Latency | How stall is set |
+|-------------|----------------|-----------------|
+| `FFMA` (multiply-add) | ~4.5 cycles | stall = 4 |
+| `IMAD` (integer multiply-add) | ~4 cycles | stall = 4 |
+| `MUFU.EX2` (hardware 2^x) | ~18 cycles | stall = 17 |
+| `LDS` (shared memory load) | ~23 cycles | uses a **barrier** instead |
+| `LDG` (global memory load) | ~200+ cycles | uses a **barrier** instead |
+
+> **Important:** Stall counts encode *short, fixed* latencies (like FFMA or MUFU). For *long, variable* latencies like memory loads, the hardware uses **dependency barriers** instead (next section). A stall count of 0 means "no wait needed" — only safe when there's no dependency on the previous result, or when a barrier already handles it.
+
+**In SASS**, dependent FFMAs look like this:
+
+```
+/*0090*/    FFMA R8, R12, R5, R8;    // produces R8
+            //  ↑ stall = 4 encoded in the control word below
+/*0098*/    FFMA R9, R13, R5, R8;    // consumes R8 — issues 4 cycles later (safe)
+```
+
+If you ever see stall=15 (the maximum) between two instructions that should only need 4 cycles, it means the compiler is being conservative — often because of aliased pointers or `asm volatile` barriers that prevent it from tracking the real latency.
+
+---
+
+### The Yield Flag
+
+**What it is:** A single bit in the control word. When set, it tells the warp scheduler: **"This warp is happy to yield — switch to another ready warp after this instruction."**
+
+**Why it exists:** Latency hiding (from the Memory Problem section) only works if the scheduler actually *switches warps* at the right moment. The yield flag is the warp's way of cooperating:
+
+> "I just issued a global memory load. That'll take 200 cycles. Go run warp B or C while I wait — I'll be here."
+
+Without yield hints, the scheduler may keep pumping instructions into the same warp even when other warps are ready and waiting. That defeats the whole point of having 48 warps per SM.
+
+**When `ptxas` sets it:**
+- After a **long-latency instruction** (LDG, MUFU on slow paths): signal that a switch is worthwhile
+- At **loop back-edges**: a natural cooperative yield point between iterations
+- Between **independent computation phases**: "I just finished hashing, about to do trilinear interpolation — good switch point"
+
+**What yield does NOT mean:** It doesn't force a context switch. It's a *hint*. If no other warp is ready, the scheduler simply continues with the current one.
+
+**In SASS**, the yield bit lives inside the raw control word hex. `cuobjdump` doesn't print a human-readable "Y" label, but you can spot yield-friendly code by looking at the control word's upper nibble pattern. The key thing to understand functionally is: if a kernel with lots of LDG loads is underperforming, and you check the SASS and every LDG is followed by code that *immediately uses* the loaded value without any intervening independent work, that's a sign the compiler scheduled the yield opportunities poorly (and also didn't hide the latency).
+
+---
+
+### Dependency Barriers
+
+**What they are:** Six slots — numbered `SB0` through `SB5` — tracked by the hardware's **scoreboard**. Three bits in the control word allocate a write-barrier to an instruction; three more bits release a read-barrier. Together they manage hazards for instructions whose latency can't be predicted at compile time (mainly memory loads).
+
+**Why they exist:** Stall counts work for FFMA (always ~4.5 cycles). But an LDG might return in 33 cycles (L1 hit), 200 cycles (L2 hit), or 400+ cycles (DRAM). The compiler can't encode "wait the right amount" — it doesn't know. So instead it uses the scoreboard:
+
+1. **Write-barrier set** — the load instruction is issued and allocated a barrier slot: "R22 will eventually be written. Mark barrier SB0."
+2. **Scoreboard monitors** — all subsequent instructions that *would use* R22 check the scoreboard. If SB0 is still pending, they **automatically stall** until the load completes.
+3. **Read-barrier cleared** — the last instruction to *consume* R22 marks "we're done with SB0." The slot is freed for reuse.
+
+Think of it like road construction:
+
+> A crew closes lane R22 (sets the barrier). Every driver who needs that lane queues up automatically. When the work finishes, the lane reopens (barrier cleared). The last driver through signals the crew: "We're all done here."
+
+**In SASS**, a well-pipelined load sequence looks like this:
+
+```
+/*0048*/    LDG.E.64.CONSTANT R22, [R4.64+0x100];
+            // ↑ write-barrier SB0 allocated: "R22, R23 will be written"
+/*0050*/    LDG.E.64.CONSTANT R28, [R4.64+0x108];
+            // ↑ write-barrier SB1 allocated: separate slot for R28, R29
+/*0058*/    LOP3.LUT R16, R10, R14, R18, 0x96, !PT;
+            // no dependency on R22/R28 — runs freely while loads are in-flight
+/*0060*/    IMAD R20, R10, R11, RZ;
+            // still independent — fills dead time while the memory bus works
+/*0068*/    FFMA R2, R22, R24, R2;
+            // USES R22 — scoreboard sees SB0 is still active — stalls automatically
+            // once SB0 clears (load complete), issues immediately
+            // ↑ read-barrier clears SB0: "R22 consumed, slot freed"
+```
+
+This is exactly what our hash grid v2 and v3 exploit: by removing `asm volatile`, the compiler is free to insert independent ALU instructions (LOP3, IMAD) between the LDG issues and their consumers — the barriers handle the stall without wasting cycles.
+
+**The 6-barrier limit:** The hardware has only six scoreboard slots. If you issue more than six outstanding loads before consuming any, the compiler inserts explicit `DEPBAR` stall instructions instead — it ran out of bookkeeping space. Keeping the in-flight load count ≤ 6 is a real design constraint. Our hash grid kernel processes level *pairs* partly for this reason: 8 loads per pair, consumed before the next pair starts, staying within budget.
+
+---
+
+### Reuse Flags
+
+**What they are:** Four bits in the control word, one per source operand slot (srcA, srcB, srcC, and the predicate). When a bit is set for an operand, the hardware **caches that register's value** in a tiny per-instruction "reuse buffer." The *immediately next* instruction that reads the same register gets the value from the cache instead of re-reading the register file.
+
+**Why they exist:** The GPU register file is multi-ported and large, but reading from it still costs energy. When the same register appears as a source in 8 consecutive FFMAs (a common pattern in matrix multiply code), the register file handles 8 identical reads — same address, same value, same power drawn each time. The reuse buffer eliminates 7 of those 8 reads.
+
+> Think of it like a reference book: if you need to look up the same table 27 times in a row, it makes more sense to keep the book open on your desk than to walk to the shelf and back 27 times.
+
+**How to see reuse flags in SASS:** `cuobjdump` labels reused operands with `.reuse`:
+
+```
+/*0090*/    FFMA R8,  R12.reuse, R5.reuse, R8;
+/*0098*/    FFMA R9,  R13.reuse, R5.reuse, R9;   // R5 still cached
+/*00A0*/    FFMA R10, R14.reuse, R5.reuse, R10;
+/*00A8*/    FFMA R11, R15.reuse, R5.reuse, R11;
+/*00B0*/    FFMA R8,  R12.reuse, R6.reuse, R8;   // new input R6, same weight R12
+/*00B8*/    FFMA R9,  R13.reuse, R6.reuse, R9;
+// R5, R6 = input values used across 8 neurons — .reuse saves 6 register-file reads each
+```
+
+**The MLP kernel and reuse:** In our 27-element dot product (inner loop of the MLP forward pass), each input value `x0`…`x26` is multiplied against 8 independent weight rows simultaneously (8-wide ILP). The register holding `x0` should have `.reuse` set on 7 of its 8 appearances:
+
+```
+// First use: read from register file
+acc[0] += w_row0 * x0          // register file read
+// Next 6 uses: served from reuse buffer
+acc[1] += w_row1 * x0.reuse    // cache hit
+acc[2] += w_row2 * x0.reuse    // cache hit
+acc[3] += w_row3 * x0.reuse    // cache hit
+acc[4] += w_row4 * x0.reuse    // cache hit
+acc[5] += w_row5 * x0.reuse    // cache hit
+acc[6] += w_row6 * x0.reuse    // cache hit
+// Last use: .reuse not set (no point caching something you won't use again)
+acc[7] += w_row7 * x0          // register file read, no cache
+```
+
+7 register-file reads replaced with 7 cache hits *per input value*, across 27 inputs. That's ~189 register-file reads saved per thread in the inner dot product alone. At 262,144 threads running simultaneously, the power difference is measurable.
+
+**What to check in your own kernels:** Look for tight FFMA loops where the same register (`R5`, `R6`, etc.) repeats across many consecutive instructions. It should show `.reuse`. If it doesn't, the compiler may have lost track of the reuse pattern — common when an unrolled loop is too long or when conditionals break the consecutive-instruction requirement (the reuse buffer only carries a value to the *immediately* next instruction, not across gaps).
+
+---
+
+> **Putting it all together:** These four fields — stall cycles, yield, dependency barriers, and reuse flags — are the warp scheduler's **instruction manual**. Ptxas writes them automatically and usually writes them well. But when you're reverse-engineering a fast kernel or trying to extract the last few percent of throughput, these fields are where you look. Correct arithmetic with wrong stall counts gives you right answers and wrong performance. Proper barrier allocation and `.reuse` everywhere gives you the same performance as a hand-tuned CUDA library. The `cuobjdump` hex is no longer noise — it's the actual mechanism.
 
 ---
 
@@ -921,6 +1084,10 @@ printf("Average: %.3f ms\n", ms / 100.0f);
 | **Sigmoid** | S-shaped function that maps any value to 0-1 range |
 | **ReLU** | `max(x, 0)` — sets negative values to zero |
 | **Neural network** | Layers of multiply-add + activation (learned from data) |
+| **Stall cycles** | Control-word field telling the scheduler how many cycles to wait before issuing the next instruction |
+| **Yield flag** | Control-word bit that lets a warp voluntarily yield to another ready warp |
+| **Dependency barrier** | Scoreboard slot (SB0–SB5) that serializes producers and consumers for variable-latency ops like LDG |
+| **Reuse flag** | Per-operand bit that caches a register value so the next instruction doesn't need to re-read the register file |
 
 ---
 
