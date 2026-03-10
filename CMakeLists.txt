@@ -54,6 +54,9 @@ endif()
 # Core library (math, primitives, image, materials)
 # ════════════════════════════════════════════════════════════════
 file(GLOB CORE_SRC src/core/*.c)
+# postprocess.c lives in src/render/ but is called by image.c (core), so
+# include it in ysu_core to resolve the dependency before ysu_render is built.
+list(APPEND CORE_SRC src/render/postprocess.c)
 add_library(ysu_core STATIC ${CORE_SRC})
 target_include_directories(ysu_core PUBLIC ${YSU_INCLUDE_DIRS})
 target_link_libraries(ysu_core PUBLIC ${PLATFORM_LIBS})
@@ -67,7 +70,6 @@ set(RENDER_SRC
     src/render/sceneloader.c
     src/render/gbuffer.c
     src/render/gbuffer_dump.c
-    src/render/postprocess.c
     src/render/ysu_mt.c
 )
 add_library(ysu_render STATIC ${RENDER_SRC})
@@ -122,7 +124,10 @@ target_link_libraries(ysu_upscale PUBLIC ysu_core)
 # ════════════════════════════════════════════════════════════════
 # Main CPU raytracer executable
 # ════════════════════════════════════════════════════════════════
-add_executable(ysu src/render/ysu_main.c)
+add_executable(ysu
+    src/render/ysu_main.c
+    src/editor/ysu_360_engine_integration.c
+)
 target_include_directories(ysu PRIVATE ${YSU_INCLUDE_DIRS})
 target_link_libraries(ysu PRIVATE
     ysu_render
