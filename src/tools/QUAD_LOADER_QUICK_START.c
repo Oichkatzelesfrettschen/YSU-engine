@@ -6,6 +6,8 @@
  */
 
 #include "gpu_obj_loader.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 /* ===========================================================================
  * OPTION 1: Load with Quad Preservation (NEW)
@@ -60,22 +62,14 @@ void load_legacy_example(void) {
 }
 
 /* ===========================================================================
- * DATA STRUCTURES
+ * DATA STRUCTURES  (defined in gpu_obj_loader.h — shown here for reference)
  * ===========================================================================
+ *
+ *   typedef struct { float v0[4]; float v1[4]; float v2[4]; } GPUTriangle;
+ *
+ *   typedef struct { float v0[4]; float v1[4];
+ *                    float v2[4]; float v3[4]; } GPUSquare;
  */
-
-typedef struct {
-    float v0[4];  // xyz + padding
-    float v1[4];
-    float v2[4];
-} GPUTriangle;
-
-typedef struct {
-    float v0[4];  // xyz + padding (vertex 0)
-    float v1[4];  // xyz + padding (vertex 1)
-    float v2[4];  // xyz + padding (vertex 2)
-    float v3[4];  // xyz + padding (vertex 3)
-} GPUSquare;
 
 /* ===========================================================================
  * OBJ FACE SUPPORT
