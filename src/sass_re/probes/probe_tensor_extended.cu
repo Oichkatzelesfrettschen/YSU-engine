@@ -78,8 +78,7 @@ probe_imma_int8(int *d_D, const signed char *d_A,
 
 // INT4 tensor core (S4 experimental precision): 8x8x32 -> INT32
 // Uses experimental API: nvcuda::wmma::experimental::precision::s4
-#if __CUDA_ARCH__ >= 890
-extern "C" __global__ void __launch_bounds__(32)
+__global__ void __launch_bounds__(32)
 probe_imma_int4(int *d_D, const void *d_A, const void *d_B, const int *d_C) {
     using namespace nvcuda::wmma::experimental;
     // INT4 uses sub-byte packing: each byte holds 2 INT4 values
@@ -95,7 +94,6 @@ probe_imma_int4(int *d_D, const void *d_A, const void *d_B, const int *d_C) {
 
     wmma::store_matrix_sync(d_D, frag_C, 8, wmma::mem_row_major);
 }
-#endif
 
 // TF32 chained: multiple MMA ops to measure throughput
 extern "C" __global__ void __launch_bounds__(32)
