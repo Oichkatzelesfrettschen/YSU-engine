@@ -24,6 +24,35 @@ First-party measurements taken with CUDA 13.1 on Windows.
 | LDG chase | 92.29 | Global memory pointer chase (L1/L2 hit) |
 | LDS chase | 28.03 | Shared memory pointer chase |
 
+### Corrected Latency Measurements (ncu-validated, RTX 4070 Ti)
+
+| Instruction | Corrected (cy) | Original (cy) | Correction |
+|---|---|---|---|
+| IABS | **0.26/pair** | 0.53 (artifact) | NEG+ABS chain. Sub-cycle confirmed -- pipeline modifier. |
+| POPC | **11.77/pair** | 23.52 | True POPC ~7-8 cy (multi-cycle INT, NOT SFU) |
+| FLO | **11.77/pair** | 23.52 | Same unit as POPC confirmed |
+| DMNMX | **77.19/pair** | 114.63 | True FP64 comparison ~38-39 cy |
+| FFMA FTZ | **4.51** | N/A | **FTZ is FREE on Ada** (same as IEEE FFMA) |
+
+### FP64 Transcendental Latencies (first-ever on Ada)
+
+| Function | Latency (cy) | vs FP32 fast | SASS decomposition |
+|---|---|---|---|
+| FP64 sin() | **820.66** | 27.8x __sinf | ~120 DFMA polynomial via libdevice |
+| FP64 log() | **1113.83** | N/A | **Most expensive scalar op** (excluding fences) |
+| FP64 sqrt() | **450.30** | N/A | MUFU.RSQ64H + 10 DFMA Newton-Raphson |
+| FP64 rsqrt() | **281.84** | N/A | Fewer NR iterations than sqrt |
+| FP32 __sinf [ref] | 29.50 | 1.0x | Single MUFU.SIN |
+
+### L1/L2/DRAM Boundary (Fisher-Yates random cycle, improved)
+
+| Working Set | Latency (cy) | Regime |
+|---|---|---|
+| 8-32 KB | 70-92 | L1 (gradual, not a cliff) |
+| 48-256 KB | 107-276 | L1 -> L2 transition (gradual) |
+| 256 KB - 48 MB | 277-420 | L2 plateau |
+| >48 MB | 420-545 | DRAM (GDDR6X) |
+
 ### Expanded Latency Measurements (RTX 4070 Ti, SM 8.9)
 
 | Instruction | Latency (cycles) | Notes |
