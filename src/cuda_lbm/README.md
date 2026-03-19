@@ -32,6 +32,7 @@ Two layout families exist:
 | kernels_int8_soa.cu         | `signed char`        | 1          | SoA pull    | Coalesced gather+scatter; int momentum accum       | SM 6.1   |
 | kernels_int16_soa.cu        | `short`              | 2          | SoA pull    | Integer load path; 3% faster than FP16 SoA        | SM 5.0   |
 | kernels_bf16_soa.cu         | `__nv_bfloat16`      | 2          | SoA pull    | 2x BW vs FP32; SM 8.0+                            | SM 8.0   |
+| kernels_bf16_soa_bf162.cu   | `__nv_bfloat16`+`bf162` | 2       | SoA pull    | 2 cells/thread; HFMA2.BF16_V2 moment accum         | SM 8.0   |
 | kernels_fp32_soa_cs.cu      | `float`              | 4          | SoA pull    | __ldg ping reads + __stcs (L2 evict-first) writes  | SM 8.0   |
 | kernels_fp64_soa.cu         | `double`             | 8          | SoA pull    | FP64 coalesced; compute-bound (not BW-bound)       | SM 6.0   |
 | kernels_int4.cu             | nibble (4-bit)       | 0.5        | SoA nibble  | BW ceiling only; 2 cells/thread; NOT physics       | SM 6.1   |

@@ -7,16 +7,34 @@ concrete optimization decisions in `src/cuda_lbm/` kernels.
 
 ## Latency Budget Per LBM Cell
 
-From `src/sass_re/RESULTS.md` (RTX 4070 Ti Super, SM 8.9):
+From `src/sass_re/RESULTS.md` (RTX 4070 Ti, SM 8.9, ncu-validated):
 
 | Instruction | Latency (cy) | Throughput (ops/clk/SM) | LBM role |
 |-------------|-------------|------------------------|----------|
-| FFMA | 4.54 | 44.6 | Equilibrium, MRT collision, Guo forcing |
-| IADD3 | 2.51 | 68.2 | SoA index arithmetic (`dir * n_cells + cell`) |
-| MUFU.RCP | 41.55 | -- | `1.0f / tau` in BGK and MRT |
-| MUFU.EX2 | 17.56 | 9.9 | Not used in LBM (used in Instant-NGP volume render) |
-| LDG | 92.29 | -- | Distribution loads (19 per cell) |
+| HFMA2.BF16 | **4.01** | **312.1** | **Fastest FMA on Ada.** BF16 bf162 moment accum. |
+| FFMA | 4.53 | 44.6 | Equilibrium, MRT collision, Guo forcing |
+| HADD2 | 4.54 | 260.1 | FP16 half2 moment accumulation |
+| IDP.4A | 4.53 | 215.2 | INT8 dp4a momentum (4x effective) |
+| IADD3 | 2.52 | 68.2 | SoA index arithmetic |
+| MUFU.RCP | 41.53 | -- | `1.0f / tau` in BGK and MRT |
+| MUFU.EX2 | 17.55 | 9.9 | Instant-NGP volume render (not LBM) |
+| POPC | ~7-8 | -- | Box counting ballot reduction (SFU corrected) |
+| REDUX.SUM | 60 | -- | Warp-level integer reduction (2.6x faster than SHFL) |
+| LDG | 92-123 | -- | Distribution loads (19 per cell) |
 | LDS | 28.03 | -- | Tiled kernel shared-memory reads |
+| LDC | 70.57 | -- | Constant memory (D3Q19 weights) |
+
+### Key corrections from ncu cross-validation
+
+- **POPC/FLO are ~7-8 cy (multi-cycle INT), NOT 23 cy (SFU).**
+  Original measurement had hidden XOR instruction doubling the chain.
+- **Denormals are FREE on Ada.** No throughput penalty for denormalized
+  float inputs (ratio = 1.00x denormal vs normal).
+- **FTZ mode is FREE.** FFMA.FTZ = 4.51 cy = FFMA IEEE. Zero overhead.
+- **IABS is sub-cycle (0.26 cy/pair).** Integer abs is a pipeline modifier.
+- **Bank conflicts max 2.2x penalty** (not 32x). Hardware coalescing.
+- **BF16 is faster than FP16** (312 vs 260 ops/clk/SM throughput,
+  4.01 vs 4.54 cy latency, 8.54 vs 10.54 cy conversion).
 
 ### BGK collision: ~57 FMA ops/cell
 
@@ -179,28 +197,47 @@ data shows that:
 
 ---
 
-## Priority Optimization Targets
+## Priority Optimization Targets (Updated)
 
-Based on the SASS measurements and the kernel performance table in
-`src/cuda_lbm/README.md`:
+Based on the SASS measurements, ncu cross-validation, and the kernel
+performance table in `src/cuda_lbm/README.md`:
 
-1. **INT8 SoA MRT + A-A kernel** (not yet implemented)
+1. **BF16 SoA bf162 kernel** (IMPLEMENTED: `kernels_bf16_soa_bf162.cu`)
+   Uses HFMA2.BF16_V2 packed FMA (fastest FMA on Ada: 4.01 cy, 312 ops/clk/SM).
+   76 HFMA2.BF16 instructions for velocity moment accumulation, 90 registers,
+   zero spills. Expected +20-25% MLUPS over scalar BF16 SoA based on measured
+   throughput advantage. **This is the highest-priority win from SASS RE.**
+
+2. **REDUX.SUM for integer reductions** (IMPLEMENTED: `kernels_box_counting.cu`)
+   Replaced ballot+popc with `__reduce_add_sync` (REDUX.SUM.S32) on SM 8.0+.
+   Single instruction at 60 cy vs 156 cy SHFL tree (2.6x faster).
+
+3. **INT8 SoA MRT + A-A kernel** (not yet implemented)
    Expected: ~5100 MLUPS (combining INT8 SoA's 5643 MLUPS with A-A's
-   VRAM halving). Currently the kernel matrix has INT8 SoA but not
-   INT8 SoA MRT A-A. This is the Pareto-optimal production kernel.
+   VRAM halving). This is the Pareto-optimal production kernel.
 
-2. **FP8 e4m3 SoA MRT + A-A kernel** (not yet implemented)
+4. **FP8 e4m3 SoA MRT + A-A kernel** (not yet implemented)
    Same logic: combine FP8 SoA throughput with A-A VRAM efficiency.
 
-3. **FP16 SoA Half2 MRT variant** (not yet implemented)
-   Half2 ILP (+9.8%) combined with MRT stability. The half2 vectorized
-   accumulation naturally provides 2-wide ILP.
+5. **FP16 SoA Half2 MRT variant** (not yet implemented)
+   Half2 ILP (+9.8%) combined with MRT stability.
 
-4. **Pre-computed inv_tau field for BGK kernels**
+6. **Pre-computed inv_tau field for BGK kernels**
    Eliminates one MUFU.RCP (41 cy) per cell. ~16% BGK ALU reduction.
 
-5. **Warp-level bounce-back via LOP3**
+7. **Warp-level bounce-back via LOP3**
    Packed solid masks + LOP3 for 32-cell-wide boundary detection.
+
+### Findings that change previous assumptions
+
+- **Bank conflicts are cheap**: Max 2.2x penalty (not 32x). Tiled kernels
+  are more viable at 64^3 than previously assumed (C-1389).
+- **Denormals are free**: No need for FTZ mode in LBM kernels. IEEE
+  compliance costs nothing on Ada.
+- **BF16 > FP16 for packed FMA**: If the 7-bit mantissa is acceptable,
+  BF16 bf162 is strictly faster than FP16 half2 on Ada.
+- **FP64 transcendentals are massive**: sin() = 821 cy, log() = 1114 cy.
+  Avoid FP64 math functions in any production kernel.
 
 ---
 
