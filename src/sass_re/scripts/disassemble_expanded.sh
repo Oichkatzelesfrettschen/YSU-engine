@@ -33,6 +33,10 @@ probe_cache_policy
 probe_nibble_packing
 probe_warp_reduction
 probe_bf16_arithmetic
+probe_async_copy
+probe_fp64_arithmetic
+probe_register_pressure
+probe_mixed_precision
 "
 
 PASS=0
