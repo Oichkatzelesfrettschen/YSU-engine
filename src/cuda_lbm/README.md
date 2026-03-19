@@ -435,3 +435,22 @@ Note: FP16 SoA H2 / INT4 / FP4 init kernels use 1 thread/cell (not 2 cells/threa
 - **INT16**: Better than INT8 for moderate-Re (DIST_SCALE=16384, LSB=6.1e-5 vs 0.016).
   Useful when INT8 saturation causes instability but FP32 bandwidth is excessive.
 - **FP64 / DD**: Compute-bound on Ada gaming (64:1 FP64 ratio). Validation/research only.
+
+---
+
+## Infrastructure Headers
+
+| Header | Purpose |
+|--------|---------|
+| `include/lbm_kernels.h` | Kernel variant enum, metadata table, VRAM/bandwidth helpers |
+| `include/lbm_kernel_selector.h` | Auto-selects optimal kernel for grid size and precision requirement (C-1392 decision table) |
+| `include/lbm_managed_memory.h` | CUDA Unified Memory config and PCIe overhead estimation for 1024^3+ grids |
+| `include/lbm_metrics.h` | Performance measurement utilities |
+
+## SASS-Informed Optimization
+
+The SASS reverse engineering measurements in `src/sass_re/` feed directly
+into kernel optimization decisions. See
+[`docs/sass/SASS_KERNEL_OPTIMIZATION_GUIDE.md`](../../docs/sass/SASS_KERNEL_OPTIMIZATION_GUIDE.md)
+for the full analysis connecting measured instruction latencies to LBM
+kernel design choices.
