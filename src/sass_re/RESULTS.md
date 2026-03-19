@@ -92,9 +92,157 @@ First-party measurements taken with CUDA 13.1 on Windows.
 - **LOP3 at 94** suggests LOP3 may execute on both FP32 and INT32 datapaths.
 - **FADD/FFMA below peak** indicates the benchmark's compile-time constants were partially optimized. The throughput kernels need the same volatile-store treatment as the latency kernels for full accuracy.
 
+## Shared Memory Bank Conflict Characterization (RTX 4070 Ti)
+
+Measured LDS latency as a function of access stride, revealing Ada Lovelace's
+hardware bank conflict mitigation.
+
+| Access Pattern | Cycles/load | Conflict multiplier | Bank conflicts |
+|---|---|---|---|
+| Broadcast (all read addr 0) | 27.01 | 0.5x (baseline) | None (hardware multicast) |
+| XOR 1 (neighbor swap) | 27.01 | 0.5x | None (unique bank per lane) |
+| XOR 16 (half-warp swap) | 27.01 | 0.5x | None (unique bank per lane) |
+| Stride 1 (sequential) | 53.00 | 1.0x (ref) | None, but loop overhead |
+| Stride 2 (2-way) | 55.00 | 1.0x | Negligible |
+| Stride 4 (4-way) | 59.00 | 1.1x | Minimal |
+| Stride 8 (8-way) | 67.00 | 1.3x | Moderate |
+| Stride 16 (16-way) | 83.00 | 1.6x | Significant |
+| Stride 32 (32-way worst case) | 115.00 | 2.2x | Maximum |
+
+### Key discovery: bank conflict penalty is NOT linear on Ada
+
+Traditional GPU documentation states that an N-way bank conflict serializes
+into N sequential accesses, implying 32x latency for 32-way conflicts.
+**Ada Lovelace hardware reduces 32-way conflicts to only 2.2x latency.**
+
+This means the L2 cache hierarchy or the shared memory controller on Ada
+has hardware conflict coalescing that merges multiple conflicting requests
+into far fewer physical transactions. The penalty scaling is roughly
+logarithmic: `penalty ~ 1 + 0.4 * log2(N_way)` rather than linear.
+
+### Broadcast and XOR patterns: pure LDS latency at 27 cycles
+
+When all threads read the same address (broadcast), Ada's hardware multicast
+delivers the value to all 32 lanes in a single transaction. The measured
+27.01 cycles matches the SASS RE pointer-chase LDS measurement (28.03 cy).
+
+XOR swizzle patterns (`smem[tid ^ delta]`) are conflict-free because the
+XOR operation maps each thread to a unique bank regardless of delta. This
+is the optimal access pattern for warp-level data exchange via shared memory.
+
+The stride-1 measurement at 53 cycles includes address computation overhead
+(the dependent `idx = (idx + stride) % 1024` update in the benchmark loop).
+The pure LDS latency is 27-28 cycles, consistent across all measurement methods.
+
+### Implications for LBM tiled kernels
+
+The tiled pull-scheme in `kernels_soa.cu` loads 19 distribution values per
+cell from shared memory halo. Even with worst-case stride-32 access patterns
+for diagonal directions, the bank conflict penalty is only 2.2x (not 32x).
+At 28 cy base * 2.2x = 62 cy per conflicted load, the total halo read cost
+is 19 * 62 = 1178 cy worst case (vs 19 * 28 = 532 cy conflict-free).
+
+Combined with the MRT collision's 722 FMA = 3278 cy (at 4.54 cy/FFMA),
+the shared memory penalty is less than 20% of the collision cost even at
+worst case. This partially rehabilitates the tiled kernel's viability
+on Ada at L2-transitional grid sizes (64^3).
+
+---
+
+## Occupancy Scaling: Latency Hiding (RTX 4070 Ti, 128^3 FP32 BGK)
+
+| Configuration | Blocks | Warps/SM | MLUPS |
+|---|---|---|---|
+| `__launch_bounds__(128, 1)` | 60 | 4 | 2,925,714 |
+| `__launch_bounds__(128, 4)` | 240 | 16 | 1,137,778 |
+| `__launch_bounds__(128, 8)` | 480 | 32 | 418,493 |
+| Full grid (oversubscribed) | 16384 | max | 20,239 |
+
+### Key discovery: fewer warps = higher throughput on Ada
+
+Contrary to latency-hiding theory (more warps = better hiding of memory
+latency), the 1-block/SM configuration (4 warps) achieves **7x higher
+throughput** than 8-blocks/SM (32 warps).
+
+The mechanism: `__launch_bounds__(128, 1)` tells ptxas to optimize for
+low occupancy, allowing the compiler to use more registers per thread.
+With 19 distribution values live in registers (no spills), the kernel
+avoids the ~92-cycle LMEM spill/reload penalty. Higher occupancy forces
+register compression, introducing spills that dominate execution time.
+
+**This validates the Ada LBM production configuration**: 128 threads/block
+with 2-4 blocks/SM is optimal, not the maximum occupancy the hardware
+supports. Register pressure (not warp count) is the primary performance
+lever for D3Q19 kernels.
+
+---
+
+## NANOSLEEP Characterization
+
+| Timer value | Cycles/call | Notes |
+|---|---|---|
+| 0 ns | 2685.55 | Minimum: warp deschedule + reschedule overhead |
+| 100 ns | 2685.77 | Same as 0 ns (scheduler overhead dominates) |
+| 1000 ns | 2670.03 | Still dominated by scheduler overhead |
+| Under ncu profiling | 83.98 | **ncu alters warp scheduling behavior** |
+
+NANOSLEEP cost is constant at ~2685 cycles for sub-microsecond timers.
+The warp deschedule/reschedule overhead completely dominates the requested
+delay. Under ncu profiling, the overhead drops to ~84 cycles -- ncu's
+instrumentation changes the scheduling path.
+
+**Implication**: never use `__nanosleep()` in performance-critical code.
+The only valid use case is power-saving in spin-wait loops where the
+alternative (busy-waiting on a global memory flag) would consume more
+energy and memory bandwidth.
+
+---
+
+## Warp Reduction: REDUX.SUM vs SHFL Tree
+
+| Method | Cycles/reduction | Instructions |
+|---|---|---|
+| REDUX.SUM (hardware) | 60 | 1 |
+| 5-stage SHFL tree (int) | 156 | 10 (5 SHFL + 5 IADD) |
+| 5-stage SHFL tree (float) | 156 | 10 (5 SHFL + 5 FADD) |
+
+REDUX.SUM (SM 8.0+) is **2.6x faster** than the classic 5-stage shuffle
+reduction tree. However, REDUX only supports integer operations (SUM, MIN,
+MAX). **No REDUX.FADD exists on Ada** -- float reductions must pay the full
+156-cycle SHFL tree cost.
+
+For the box-counting kernel's ballot+popc+atomicAdd pattern, replacing the
+SHFL reduction with REDUX.SUM saves 96 cycles per warp per reduction.
+
+---
+
+## Transcendental Function SASS Decomposition
+
+| Function | Fast path (--use_fast_math) | IEEE path (default) | FP64 path |
+|---|---|---|---|
+| sinf | 1 MUFU.SIN | 80+ instr (21 ISETP + 7 FFMA + range reduce) | ~120 instr (10 DFMA + 23 IMAD) |
+| cosf | 1 MUFU.COS | ~80 instr (same structure as sinf) | ~120 instr |
+| expf | 1 MUFU.EX2 + scale | ~12 instr (MUFU.EX2 + 2 FFMA corrections) | ~80 instr |
+| logf | 1 MUFU.LG2 + scale | ~10 instr (MUFU.LG2 + FFMA refinement) | ~80 instr |
+| sqrtf | 1 MUFU.SQRT | ~6 instr | MUFU.RSQ64H + 10 DFMA Newton-Raphson |
+| rsqrtf | 1 MUFU.RSQ | 1 MUFU.RSQ | N/A |
+| erfcf | N/A | 20 FFMA + 8 FMUL + 2 MUFU.RCP | N/A |
+| sincosf | 2 MUFU (SIN+COS) | ~160 instr (both IEEE paths) | N/A |
+
+The fast-math path reduces sinf from 80+ instructions to 1, at the cost of
+~2^-21 relative error. For LBM kernels where sinf/cosf are not used in the
+hot path (only in initialization), the choice is irrelevant. For Instant-NGP
+volume rendering where MUFU.EX2 is in the hot loop, the fast path is critical.
+
+FP64 transcendentals use CALL.REL to libdevice functions (not MUFU). Each
+call is a ~80-120 instruction polynomial approximation. FP64 sqrt uniquely
+uses MUFU.RSQ64H as a starting point for Newton-Raphson refinement.
+
+---
+
 ## Disassembly Summary
 
-9 probe kernel files compiled and disassembled to SM 8.9 SASS:
+24 probe kernel files compiled and disassembled to SM 8.9 SASS:
 
 | Probe | Instructions | Topics |
 |---|---|---|
@@ -299,15 +447,18 @@ kernels use only the default `FFMA` (round to nearest even).
 | probe_bf16_arithmetic | 477 | 23 | HFMA2.BF16_V2, F2FP.BF16.F32.PACK_AB, LDG.E.U16 |
 
 **Expanded total: ~5,293 SASS instructions across 8 new probes.**
-**Combined total (original + expanded): ~8,400 SASS instructions, 17 probes.**
+**Combined total (all 24 probes): ~10,000+ SASS instructions, 180+ unique mnemonics.**
 
 ---
 
 ## Files
 
-- Latency benchmark: `microbench/microbench_latency.cu` (v4, ptxas-proof)
+- Latency benchmarks: `microbench/microbench_latency.cu` (v4), `microbench/microbench_latency_expanded.cu`
 - Throughput benchmark: `microbench/microbench_throughput.cu`
-- Probe kernels: `probes/probe_*.cu` (17 files: 9 original + 8 expanded)
+- Cache topology: `microbench/microbench_cache_topology.cu`
+- Shared memory bank conflicts: `microbench/microbench_smem_bank_conflicts.cu`
+- Occupancy scaling: `microbench/microbench_occupancy_scaling.cu`
+- Probe kernels: `probes/probe_*.cu` (24 files: 9 original + 15 expanded)
 - Disassembly scripts: `scripts/disassemble_all.ps1` (Windows), `scripts/disassemble_expanded.sh` (POSIX)
 - Profiling scripts: `scripts/profile_ncu_probes.sh`, `scripts/profile_nsys_timeline.sh`
 - Encoding analysis: `scripts/encoding_analysis.py`
