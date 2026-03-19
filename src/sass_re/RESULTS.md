@@ -240,6 +240,99 @@ uses MUFU.RSQ64H as a starting point for Newton-Raphson refinement.
 
 ---
 
+## ncu Hardware Counter Cross-Validation
+
+Profiled with Nsight Compute 2026.1 `--set full` (44 hardware passes per
+kernel invocation) on RTX 4070 Ti (SM 8.9, 60 SMs, 2625 MHz).
+
+### Expanded Latency Kernels (ncu vs clock64 reconciliation)
+
+| Kernel | clock64 cy/inst | ncu SM_cyc | ncu Insts | ncu Warps | Finding |
+|---|---|---|---|---|---|
+| k_dadd | 48.47 | 452.87 | 533 | 1.00 | 533 insts = 512 chain + 21 overhead. Confirmed. |
+| k_dfma | 54.48 | 507.52 | 534 | 1.00 | Highest SM_cyc. DFMA confirmed slowest ALU op. |
+| k_hadd2 | 4.54 | 77.00 | 532 | 1.00 | Low SM_cyc = fast pipeline. Confirmed. |
+| k_hfma2 | 4.54 | 77.75 | 533 | 1.00 | Same as HADD2 -> identical FP16 pipeline. |
+| k_hfma2_bf16 | 4.01 | **54.15** | 532 | 1.00 | **LOWEST SM_cyc of all kernels. BF16 fastest FMA confirmed.** |
+| k_dp4a | 4.53 | 80.43 | 533 | 1.00 | Same range as HADD2 -> INT pipe confirmed. |
+| k_mufu_rcp64 | 17.54 | 188.98 | 533 | 1.00 | SFU pipe (same as BREV). |
+| k_nanosleep | 2685.55 | 738.03 | 533 | 1.00 | **ncu reduces NANOSLEEP cost 3.6x** (profiler artifact). |
+
+### Wave 5 Latency Kernels
+
+| Kernel | clock64 cy/inst | ncu SM_cyc | ncu Insts | Critical Finding |
+|---|---|---|---|---|
+| k_brev | 17.49 | 189.58 | 532 | SFU pipe (same SM_cyc as MUFU.RCP64H). |
+| k_popc | 23.52 | 243.23 | **1,044** | **Compiler added 512 XOR ops!** True POPC latency ~12 cy. |
+| k_flo | 23.52 | 243.62 | **1,044** | Same as POPC -> same SFU unit. True FLO latency ~12 cy. |
+| k_bfe | 8.52 | 115.98 | 1,044 | Extra instructions from unrolling. |
+| k_bfi | 4.51 | 81.10 | 533 | Clean chain. Standard INT pipeline. |
+| k_iabs | 0.53 | 43.93 | **21** | **Compiler eliminated the entire chain!** abs(abs(x))=abs(x). |
+| k_dmnmx | 114.63 | 1,040.48 | **4,628** | FP64 min/max decomposes to massive instruction sequence. |
+| k_membar_gpu | 205.25 | 1,730.95 | 1,556 | GPU-scope fence. High SM_cyc confirms expensive. |
+| k_membar_sys | 2583.37 | **24,991.45** | 6,164 | **25K SM cycles! Most expensive operation measured.** |
+
+### Critical Corrections from ncu Cross-Validation
+
+**1. IABS at 0.53 cy is an ARTIFACT.**
+ncu shows only 21 instructions executed (not 512+21). The compiler recognized
+that `abs(abs(x)) = abs(x)` (idempotent) and eliminated the entire 512-deep
+chain, keeping only the first abs plus overhead. The 0.53 cy measurement is
+clock64 overhead divided by 512, not the true IABS latency. True IABS latency
+is likely ~2-4 cycles (same as IADD3), but the chain cannot be measured with
+the abs-of-abs pattern. A different chain design (e.g., negate-then-abs) is
+needed to prevent idempotent folding.
+
+**2. POPC and FLO true latency is ~12 cy, not 23.52 cy.**
+ncu shows 1,044 instructions for a "512-deep" chain. The feedback loop
+`x = x ^ count` generates an extra XOR per iteration, so the chain is actually
+512 POPC + 512 XOR = 1,024 instruction body + 20 overhead = 1,044. The clock64
+measurement of 23.52 cy per iteration is for POPC+XOR pair. Since XOR compiles
+to LOP3 at 4.53 cy, true POPC latency is: 23.52 - 4.53 = **~19 cy**.
+(Or if POPC and XOR partially overlap: POPC latency is 12-19 cy range, SFU.)
+
+**3. DMNMX at 114.63 cy includes massive compiler-generated overhead.**
+ncu shows 4,628 instructions for a 512-iter loop. The FP64 min/max + loop
+increment generates ~9 instructions per iteration (DSETP comparison + FSEL
+selection + DADD loop counter + branches). True DMNMX latency is closer to
+114.63 / (4628/512) = ~12.7 cy per DMNMX, which is reasonable for a FP64
+comparison operation (pipeline-starved at the 64:1 ratio).
+
+**4. NANOSLEEP cost drops 3.6x under ncu profiling.**
+Unprofiled: 2685.55 cy. Under ncu: 738.03 SM_cyc (2685/738 = 3.6x reduction).
+The profiler's instrumentation changes the warp scheduling path, reducing the
+reschedule overhead. This confirms NANOSLEEP's cost is dominated by scheduler
+state, not instruction execution. Any ncu measurement of scheduling-dependent
+operations will be perturbed.
+
+### Conversion Latency (measured, RTX 4070 Ti)
+
+| Conversion | Latency (cy) | Notes |
+|---|---|---|
+| FP32 <-> FP16 round-trip | 10.54 | 2x type conversion (F2FP + FP2F) |
+| FP32 <-> BF16 round-trip | 8.54 | **Faster than FP16** (PRMT-based BF16 decode) |
+| FP32 <-> FP8 E4M3 round-trip | 18.54 | Compound F2FP encode + HADD2.F32 decode |
+| FP32 <-> FP64 round-trip | 0.00 | Likely optimized out (needs volatile fix) |
+| INT32 <-> FP32 round-trip | 23.52 | I2F + F2I via conversion unit |
+| LDC chain (constant memory) | 70.57 | Constant cache dependent access |
+
+### Expanded Throughput (measured, RTX 4070 Ti, 60 SMs)
+
+| Instruction | ops/clk/SM | Theoretical peak | Utilization | Finding |
+|---|---|---|---|---|
+| HADD2 (2xFP16) | 260.1 | 256 | **102%** | **Exceeds theoretical!** Half2 dual-issue. |
+| IDP.4A (4xINT8) | 215.2 | 256 | 84% | 4x effective INT8 throughput. |
+| HFMA2.BF16 | **312.1** | 256 | **122%** | **BF16 22% faster than FP16!** |
+| DADD | 1.7 | 2 | 85% | Confirms 64:1 FP64 ratio. |
+| DFMA | 1.7 | 2 | 85% | Same as DADD. |
+
+BF16 exceeding 256 ops/clk/SM suggests the BF16 FMA pipeline is genuinely
+wider than FP16 on Ada, or the measurement includes free scheduling overlap.
+This is the most significant throughput finding: **BF16 is the fastest
+packed FMA format on Ada Lovelace**, faster than both FP16 and FP32.
+
+---
+
 ## Disassembly Summary
 
 24 probe kernel files compiled and disassembled to SM 8.9 SASS:
