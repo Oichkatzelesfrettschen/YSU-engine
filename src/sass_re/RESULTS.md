@@ -24,6 +24,48 @@ First-party measurements taken with CUDA 13.1 on Windows.
 | LDG chase | 92.29 | Global memory pointer chase (L1/L2 hit) |
 | LDS chase | 28.03 | Shared memory pointer chase |
 
+### Expanded Latency Measurements (RTX 4070 Ti, SM 8.9)
+
+| Instruction | Latency (cycles) | Notes |
+|---|---|---|
+| DADD | 48.47 | FP64 add (**10.7x slower than FADD**) |
+| DFMA | 54.48 | FP64 fused multiply-add (**12.0x slower than FFMA**) |
+| DMUL | 48.47 | FP64 multiply (same as DADD) |
+| MUFU.RCP64H | 17.54 | FP64 reciprocal approx (**2.4x faster than FP32 MUFU.RCP!**) |
+| HADD2 | 4.54 | FP16 packed half2 add (same latency as FADD) |
+| HFMA2 | 4.54 | FP16 packed half2 FMA (same latency as FFMA) |
+| HFMA2.BF16 | 4.01 | BF16 packed bfloat162 FMA (**faster than FP16/FP32!**) |
+| IDP.4A | 4.53 | INT8 dot product (4-element, same as IMAD) |
+| NANOSLEEP(0) | 2685.25 | Warp yield with zero timer (**massive overhead**) |
+
+### Key observations (expanded)
+
+- **FP64 latency ~48-54 cycles** is 10-12x FP32 latency. This confirms FP64 is
+  *pipeline-starved* on Ada gaming SKUs (64:1 ratio). The FP64 unit is shared across
+  many warps, so dependent FP64 chains stall waiting for the scarce FP64 ALU.
+- **MUFU.RCP64H at 17.54 cyc is FASTER than FP32 MUFU.RCP (41.55 cyc)!** This is a
+  surprising result. RCP64H is a single-precision reciprocal approximation of the
+  high word of a double, not a true FP64 reciprocal. It feeds into a Newton-Raphson
+  refinement loop that the compiler generates separately. The measurement captures
+  only the approximation step.
+- **HADD2/HFMA2 at 4.54 cyc = same as FADD/FFMA.** Half2 packed ops have identical
+  latency to scalar FP32. Since they process 2 FP16 values per instruction, the
+  effective throughput per value is 2x FP32 at the same latency. This validates the
+  +9.8% ILP gain in `kernels_fp16_soa_half2.cu`.
+- **HFMA2.BF16 at 4.01 cyc is FASTER than FP16 (4.54 cyc).** This is unexpected --
+  BF16 packed FMA has ~12% lower latency than FP16 packed FMA. Possible explanations:
+  (a) BF16 FMA uses a shorter mantissa path (7 bits vs 10), (b) the BF16 pipeline
+  has fewer normalization stages, or (c) measurement artifact from chain convergence.
+  If real, this has implications for `kernels_bf16_soa.cu` -- the *latency* advantage
+  of BF16 is negated by the *scalar load* penalty (PRMT-based conversion at 4.51 cy).
+- **IDP.4A at 4.53 cyc** confirms the INT8 dot product has the same latency as a
+  scalar IMAD. Since IDP.4A computes 4 multiply-adds in one instruction, the effective
+  throughput per INT8 operation is 4x IMAD.
+- **NANOSLEEP(0) at 2685 cyc** is enormous -- yielding the warp even with zero delay
+  costs ~2685 cycles. This is the full warp-reschedule overhead. Implication: never
+  use __nanosleep() in performance-critical code paths. The only valid use case is
+  spin-wait loops where sleeping is cheaper than busy-waiting on memory.
+
 ### Key observations
 
 - **IADD3 at ~2.5 cyc** is the fastest instruction, suggesting a 2-stage integer add pipeline.
