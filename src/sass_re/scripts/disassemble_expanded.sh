@@ -68,6 +68,9 @@ probe_int64_arithmetic
 probe_warp_matrix_shared
 probe_coalescing_patterns
 probe_l1_l2_dram_boundary
+probe_tensor_deep
+probe_optix_rt_core
+probe_optix_host_pipeline
 "
 
 PASS=0
