@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 418 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 419 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -551,7 +551,7 @@ Latency notation:
 
 ---
 
-**Total: 418 unique SASS mnemonics across 25 categories.**
+**Total: 419 unique SASS mnemonics across 25 categories.**
 
 All latencies measured on RTX 4070 Ti (SM 8.9, 2625 MHz, 60 SMs).
 See `RESULTS.md` for measurement methodology, ncu cross-validation,
