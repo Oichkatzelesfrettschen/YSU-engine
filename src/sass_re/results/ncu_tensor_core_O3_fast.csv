@@ -1,0 +1,8 @@
+kernel,sm_cycles_active,instructions_executed,registers_per_thread,clock64_latency_cy,flags
+k_tc_fp16_f32,322.68,1584,26,66.28,"-O3 --use_fast_math --restrict"
+k_tc_fp16_f16,219.97,1579,22,42.14,"-O3 --use_fast_math --restrict"
+k_tc_bf16_f32,326.82,1580,26,66.33,"-O3 --use_fast_math --restrict"
+k_tc_tf32_f32,327.40,1845,38,66.66,"-O3 --use_fast_math --restrict"
+k_tc_int8_i32,184.05,1325,23,34.06,"-O3 --use_fast_math --restrict"
+k_tc_int4_i32,169.38,1057,16,28.05,"-O3 --use_fast_math --restrict"
+k_tc_uint4_i32,166.23,1057,16,28.05,"-O3 --use_fast_math --restrict"
