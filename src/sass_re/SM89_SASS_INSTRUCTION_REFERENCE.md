@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 363 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 364 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -494,6 +494,7 @@ Latency notation:
 | `UPOPC` |  | default | |
 | `USHF.L.U32` |  | default | |
 | `USHF.R.S32.HI` |  | default | |
+| `ULEA` | ~2.5 cy (uniform pipeline) | tiling probes (-O3 --restrict) | Uniform load effective address for tile base computation. Opcode 0x7891. |
 
 ### Warp Vote/Match/Redux (7 mnemonics)
 
