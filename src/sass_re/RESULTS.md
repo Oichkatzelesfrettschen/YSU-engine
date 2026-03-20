@@ -24,11 +24,56 @@ First-party measurements taken with CUDA 13.1 on Windows.
 | LDG chase | 92.29 | Global memory pointer chase (L1/L2 hit) |
 | LDS chase | 28.03 | Shared memory pointer chase |
 
-### Tensor Core Latency (first-ever measurement on Ada Lovelace)
+### Tensor Core Latency -- ALL Precisions (first-ever on Ada Lovelace)
 
-| Instruction | Latency (cy) | Ops/instruction | Notes |
+| Format | Input -> Accum | Latency (cy) | SASS Instruction | Ops/WMMA | Eff FMA/cy |
+|---|---|---|---|---|---|
+| INT4 S4 | INT4 -> INT32 | **28.05** | IMMA.8832.S4.S4 | 256 | **9.13** |
+| UINT4 U4 | UINT4 -> INT32 | **28.05** | IMMA.8832.U4.U4 | 256 | **9.13** |
+| INT8 S8 | INT8 -> INT32 | **34.06** | IMMA.16816.S8.S8 | 256 | **7.52** |
+| FP16 | FP16 -> FP16 | **42.14** | HMMA.16816.F16 | 256 | **6.07** |
+| FP16 | FP16 -> FP32 | 66.28 | HMMA.16816.F32 | 256 | 3.86 |
+| BF16 | BF16 -> FP32 | 66.33 | HMMA.16816.F32.BF16 | 256 | 3.86 |
+| TF32 | TF32 -> FP32 | 66.66 | 2x HMMA.1684.F32.TF32 | 256 | 3.84 |
+
+Key TC findings:
+- **INT4 is fastest per-instruction** at 28 cy (9.13 effective FMA/cy)
+- **FP16 -> FP16 accum is 36% faster** than FP16 -> FP32 (42 vs 66 cy)
+- **BF16 TC = FP16 TC** at FP32 accumulator (66.33 vs 66.28 cy, identical)
+- **TF32's 2x HMMA decomposition does NOT double latency** (pipelines overlap)
+- **TC + FP32 ALU run in parallel** on separate pipelines (confirmed)
+
+### Exotic Format Emulation Latencies (Ada software emulation costs)
+
+| Format | Latency (cy) | vs FFMA (4.53) | Category |
 |---|---|---|---|
-| HMMA.16816 (FP16) | **66.19** | 256 FMA | 3.88 effective FMA/cy per instruction |
+| Q16.16 FXP ADD | **0.53** | 0.12x | **FREE!** Same as IADD3 |
+| INT128 ADD (asm) | 13.63 | 3.0x | 2x64 carry chain |
+| FP8 E4M3 round-trip | 18.54 | 4.1x | Compound F2FP encode+decode |
+| FP8 E5M2 round-trip | 18.53 | 4.1x | Identical to E4M3 |
+| Q16.16 FXP MUL | 26.49 | 5.8x | IMAD.WIDE + shift |
+| Bignum 128-bit ADD | 34.06 | 7.5x | 2-limb carry (loop overhead) |
+| Bignum 256-bit ADD | 66.05 | 14.6x | Linear: ~34 cy/limb |
+| Bignum 512-bit ADD | 138.05 | 30.5x | Linear confirmed |
+| FP4 E2M1 round-trip | 142.87 | 31.5x | LUT encode (branch chain) |
+| Posit<8,0> decode | 167.14 | 36.9x | Regime extraction + exp2f |
+| NF4 round-trip | 169.88 | 37.5x | 15-boundary binary search |
+| Bignum 1024-bit ADD | 282.05 | 62.3x | Linear continues |
+| BCD packed ADD | 291.05 | 64.2x | Nibble carry correction |
+| DD FP128 MUL | 314.35 | 69.4x | two_prod + correction |
+| DD FP128 ADD | 500.28 | 110.4x | two_sum cascade |
+| QD FP256 ADD | 828.28 | 182.8x | 4-double cascade |
+
+Key exotic format findings:
+- **FP8 E5M2 = E4M3** at 18.53 cy (identical F2FP instruction cost)
+- **INT128 ADD at 13.63 cy** is surprisingly cheap (5.3x INT64 ADD)
+- **FP4/NF4 encode at 143-170 cy** is expensive due to branch chains
+- **DD MUL (314 cy) < DD ADD (500 cy)** -- multiply is CHEAPER than add!
+  (two_prod uses FMA which is faster than two_sum's correction sequence)
+- **Posit decode at 167 cy** -- prohibitively expensive on GPU
+- **Bignum scaling is perfectly linear**: ~34 cy per additional 64-bit limb
+
+### Conversion Latency (measured, RTX 4070 Ti)
 
 With 4 TC units per SM, theoretical peak: 15.5 independent HMMA/cy/SM.
 At 256 FMA ops per HMMA: 15.5 * 256 = **3,968 FMA ops/cy/SM** peak TC throughput.
