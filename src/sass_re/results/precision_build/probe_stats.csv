@@ -59,3 +59,6 @@ probe_vectorized_widths,1,488,23,16,0,0
 probe_warp_elect_activemask,1,160,43,12,0,0
 probe_warp_matrix_shared,1,304,37,26,0,0
 probe_warp_reduction,1,256,39,16,0,0
+probe_tiling_2d_stencil,1,920,57,38,0,0
+probe_tiling_register_blocking,1,976,54,56,0,0
+probe_tiling_smem_patterns,1,576,56,28,0,0
