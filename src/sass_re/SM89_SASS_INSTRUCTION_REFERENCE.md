@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 419 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 443 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -62,6 +62,30 @@ Latency notation:
 | `REDUX.SUM` | 60.01 cy (2.6x faster than SHFL tree) | __reduce_add_sync() | default | |
 | `REDUX.SUM.S32` | 60.01 cy | __reduce_add_sync() | default | |
 | `REDUX.XOR` |  | asm redux.sync.xor | shared atomics probes | **Warp-level XOR reduction.** Single-instruction bitwise parity across 32 lanes. Enables warp-wide parity/checksum in 1 cycle. Not ADD/MIN/MAX -- bitwise XOR fold. |
+| `ATOM.E.ADD.64.STRONG.SYS` |  | atomicAdd_system(u64) | -G debug | 64-bit system-scope atomic add |
+| `ATOM.E.ADD.F32.FTZ.RN.STRONG.SYS` |  | atomicAdd_system(float) | -G debug | System-scope FP32 atomic add with FTZ |
+| `ATOM.E.ADD.STRONG.SYS` |  | atomicAdd_system(int) | -G debug | System-scope INT32 atomic add |
+| `ATOM.E.AND.STRONG.SYS` |  | atomicAnd_system() | -G debug | System-scope bitwise AND |
+| `ATOM.E.CAS.STRONG.SYS` |  | atomicCAS_system() | -G debug | System-scope compare-and-swap |
+| `ATOM.E.DEC.STRONG.GPU` |  | atomicDec(global) | -G debug | Global wrapping decrement with GPU ordering |
+| `ATOM.E.EXCH.STRONG.SYS` |  | atomicExch_system() | -G debug | System-scope exchange |
+| `ATOM.E.INC.STRONG.GPU` |  | atomicInc(global) | -G debug | Global wrapping increment with GPU ordering |
+| `ATOM.E.MAX.S32.STRONG.SYS` |  | atomicMax_system(int) | -G debug | System-scope signed max |
+| `ATOM.E.MAX.STRONG.GPU` |  | atomicMax(unsigned,global) | -G debug | Unsigned max with GPU ordering |
+| `ATOM.E.MAX.STRONG.SYS` |  | atomicMax_system(unsigned) | -G debug | System-scope unsigned max |
+| `ATOM.E.MIN.S32.STRONG.SYS` |  | atomicMin_system(int) | -G debug | System-scope signed min |
+| `ATOM.E.MIN.STRONG.GPU` |  | atomicMin(unsigned,global) | -G debug | Unsigned min with GPU ordering |
+| `ATOM.E.MIN.STRONG.SYS` |  | atomicMin_system(unsigned) | -G debug | System-scope unsigned min |
+| `ATOM.E.OR.STRONG.SYS` |  | atomicOr_system() | -G debug | System-scope bitwise OR |
+| `ATOM.E.XOR.STRONG.SYS` |  | atomicXor_system() | -G debug | System-scope bitwise XOR |
+| `RED.E.ADD.S32.STRONG.GPU` |  | atomicAdd(global) [red path] | -G debug | Signed INT32 reduction add |
+| `RED.E.ADD.S32.STRONG.SYS` |  | atomicAdd_system() [red path] | -G debug | System-scope signed reduction add |
+| `RED.E.AND.STRONG.GPU` |  | atomicAnd(global) [red path] | -G debug | Reduction AND (no return value) |
+| `RED.E.MAX.S32.STRONG.SYS` |  | atomicMax_system() [red] | -G debug | System-scope reduction max |
+| `RED.E.MIN.S32.STRONG.SYS` |  | atomicMin_system() [red] | -G debug | System-scope reduction min |
+| `RED.E.MIN.STRONG.GPU` |  | atomicMin(unsigned) [red] | -G debug | Unsigned reduction min |
+| `RED.E.OR.STRONG.GPU` |  | atomicOr(global) [red path] | -G debug | Reduction OR (no return value) |
+| `RED.E.XOR.STRONG.GPU` |  | atomicXor(global) [red path] | -G debug | Reduction XOR (no return value) |
 
 ### Atomic Shared (7 mnemonics)
 
@@ -551,7 +575,7 @@ Latency notation:
 
 ---
 
-**Total: 419 unique SASS mnemonics across 25 categories.**
+**Total: 443 unique SASS mnemonics across 25 categories.**
 
 All latencies measured on RTX 4070 Ti (SM 8.9, 2625 MHz, 60 SMs).
 See `RESULTS.md` for measurement methodology, ncu cross-validation,
