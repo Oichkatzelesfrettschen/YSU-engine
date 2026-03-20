@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 370 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 388 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -41,20 +41,28 @@ Latency notation:
 | `ATOMG.E.MIN.S32.STRONG.GPU` |  | default | |
 | `ATOMG.E.OR.STRONG.GPU` |  | default | |
 | `ATOMG.E.XOR.STRONG.GPU` |  | default | |
+| `RED.E.ADD.64.STRONG.GPU` |  | shared atomics probes | 64-bit global reduction add with strong memory ordering |
 | `RED.E.ADD.F32.FTZ.RN.STRONG.GPU` |  | default | |
 | `RED.E.ADD.STRONG.GPU` |  | default | |
+| `RED.E.MAX.S32.STRONG.GPU` |  | shared atomics probes | Global reduction max (signed INT32, strong ordering) |
+| `RED.E.MIN.S32.STRONG.GPU` |  | shared atomics probes | Global reduction min (signed INT32, strong ordering) |
+| `REDUX` |  | shared atomics probes | Bare warp reduction (no type suffix, compiler-selected) |
 | `REDUX.MAX.S32` | ~60 cy | default | |
 | `REDUX.MIN.S32` | ~60 cy | default | |
 | `REDUX.OR` |  | default | |
 | `REDUX.SUM` | 60.01 cy (2.6x faster than SHFL tree) | default | |
 | `REDUX.SUM.S32` | 60.01 cy | default | |
+| `REDUX.XOR` |  | shared atomics probes | **Warp-level XOR reduction.** Single-instruction bitwise parity across 32 lanes. Enables warp-wide parity/checksum in 1 cycle. Not ADD/MIN/MAX -- bitwise XOR fold. |
 
-### Atomic Shared (3 mnemonics)
+### Atomic Shared (7 mnemonics)
 
 | Mnemonic | Measured Latency | Flags | Notes |
 |---|---|---|---|
-| `ATOMS.CAST.SPIN` |  | -G | |
-| `ATOMS.CAST.SPIN.64` |  | -G | |
+| `ATOMS.CAS` |  | shared atomics probes | **Shared memory compare-and-swap (32-bit).** Used for lock-free CAS loops on smem. Generates ATOMS.CAS instruction (distinct from ATOM.E.CAS for global). |
+| `ATOMS.CAS.64` |  | shared atomics probes | **Shared memory 64-bit CAS.** For 64-bit lock-free updates in smem. |
+| `ATOMS.CAST.SPIN` |  | -G | Debug spin-lock CAS loop |
+| `ATOMS.CAST.SPIN.64` |  | -G | Debug 64-bit spin-lock |
+| `ATOMS.EXCH` |  | shared atomics probes | **Shared memory exchange.** Atomically replaces smem value, returns old value. Used for last-writer-wins patterns. |
 | `ATOMS.POPC.INC.32` |  | default | |
 
 ### Barrier/Sync (3 mnemonics)
@@ -158,6 +166,7 @@ Latency notation:
 | `F2I.TRUNC.NTZ` | ~12.03 cy (F2I+I2F round-trip) | default | |
 | `F2I.U32.NTZ` |  | default | |
 | `F2I.U32.TRUNC.NTZ` |  | default | |
+| `F2I.U64.TRUNC` |  | INT64 tiling probes | **Float to unsigned 64-bit with truncation.** New 64-bit conversion variant. |
 | `I2F.F64` |  | default | |
 | `I2F.F64.S64` |  | default | |
 | `I2F.RM` |  | default | |
@@ -166,6 +175,7 @@ Latency notation:
 | `I2F.S8` | ~6 cy (direct byte-to-float) | --restrict | |
 | `I2F.U16` |  | default | |
 | `I2F.U32.RP` |  | default | |
+| `I2F.U64.RP` |  | INT64 tiling probes | **Unsigned 64-bit to float with round-toward-positive.** New FP64 conversion variant. |
 | `I2FP.F32.S32` | ~6 cy | default | |
 | `I2FP.F32.S32.RZ` | ~~6 (similar) | default | |
 | `I2FP.F32.U32` |  | default | |
@@ -407,13 +417,16 @@ Latency notation:
 | `STL` |  | --restrict / -G | |
 | `STL.64` |  | default | |
 
-### Memory Shared (5 mnemonics)
+### Memory Shared (9 mnemonics)
 
 | Mnemonic | Measured Latency | Flags | Notes |
 |---|---|---|---|
 | `LDS` | 28.03 cy (shared memory) | default | |
 | `LDS.128` |  | default | |
 | `LDS.64` |  | default | |
+| `LDS.S8` |  | INT8 tiling probes | **Signed 8-bit shared memory load.** Sign-extends byte to 32-bit register. First sub-byte signed smem load observed. |
+| `LDS.S16` |  | INT16 tiling probes | **Signed 16-bit shared memory load.** Sign-extends short to 32-bit register. |
+| `LDS.U8` |  | bitops tiling probes | Unsigned 8-bit shared memory load. |
 | `STS` |  | default | |
 | `STS.U16` |  | default | |
 
@@ -493,6 +506,7 @@ Latency notation:
 | `UIMAD` |  | default | |
 | `UIMAD.WIDE` |  | tiling probes (-O3 --restrict) | **Uniform IMAD with 64-bit result** (for uniform 64-bit address computation) |
 | `UIMAD.WIDE.U32` |  | default | |
+| `UISETP.GE.AND` |  | INT tiling probes | Uniform unsigned greater-or-equal with AND combiner |
 | `UISETP.GE.U32.AND` |  | --maxrregcount | |
 | `UISETP.GT.AND` |  | --maxrregcount | |
 | `UISETP.NE.U32.AND` |  | barrier probes | Uniform unsigned not-equal set-predicate |
@@ -501,7 +515,9 @@ Latency notation:
 | `UMOV` |  | default | |
 | `UPOPC` |  | default | |
 | `USHF.L.U32` |  | default | |
+| `UPRMT` |  | INT8 tiling probes | **Uniform byte permute.** Uniform datapath equivalent of PRMT. Used for warp-uniform byte shuffle in INT8 pack/unpack patterns. |
 | `USHF.R.S32.HI` |  | default | |
+| `USHF.R.U32.HI` |  | bitops tiling probes | Uniform unsigned right shift high |
 | `ULEA` | ~2.5 cy (uniform pipeline) | tiling probes (-O3 --restrict) | Uniform load effective address for tile base computation. Opcode 0x7891. |
 
 ### Warp Vote/Match/Redux (7 mnemonics)
@@ -518,7 +534,7 @@ Latency notation:
 
 ---
 
-**Total: 363 unique SASS mnemonics across 25 categories.**
+**Total: 388 unique SASS mnemonics across 25 categories.**
 
 All latencies measured on RTX 4070 Ti (SM 8.9, 2625 MHz, 60 SMs).
 See `RESULTS.md` for measurement methodology, ncu cross-validation,
