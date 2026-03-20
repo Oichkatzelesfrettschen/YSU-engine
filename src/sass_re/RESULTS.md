@@ -73,6 +73,24 @@ Key exotic format findings:
 - **Posit decode at 167 cy** -- prohibitively expensive on GPU
 - **Bignum scaling is perfectly linear**: ~34 cy per additional 64-bit limb
 
+### Additional Gap-Fill Measurements (appended)
+
+| Format | Latency (cy) | Notes |
+|---|---|---|
+| Q8.8 FXP MUL | 14.54 | 16-bit fixed-point multiply (IMAD + shift) |
+| Bignum 128-bit MUL | 53.05 | 64x64->128 via __umul64hi + mix (~DFMA cost) |
+| INT16 I2F+F2I chain | 44.51 | Short-to-float round-trip (widening + narrowing) |
+| UINT8 pointer chase | 44.99 | Byte-indexed array chase (L1/L2 hit) |
+
+Findings:
+- Q8.8 MUL at 14.54 cy is cheaper than Q16.16 MUL (26.49 cy) because the
+  16-bit multiply fits in a single IMAD (no IMAD.WIDE needed).
+- Bignum 128-bit MUL at 53 cy is close to DFMA (54 cy) -- the __umul64hi
+  instruction dominates, sharing the same multi-cycle pipeline.
+- INT16 I2F+F2I at 44.51 cy is much higher than INT32 I2F+F2I (12.03 cy)
+  because INT16 requires widening to INT32 first (I2F.S16 instruction).
+- UINT8 pointer chase at 45 cy suggests L1 hit (below L2 at 92+ cy).
+
 ### Conversion Latency (measured, RTX 4070 Ti)
 
 With 4 TC units per SM, theoretical peak: 15.5 independent HMMA/cy/SM.
@@ -649,3 +667,56 @@ kernels use only the default `FFMA` (round to nearest even).
 - Encoding analysis: `scripts/encoding_analysis.py`
 - Full SASS dumps: `results/20260306_190541/*.sass`
 - Encoding report: `results/20260306_190541/ENCODING_ANALYSIS.md`
+
+---
+
+## Definitive Summary (2026-03-19)
+
+| Metric | Value |
+|---|---|
+| Probe kernels | 61 |
+| Microbenchmarks | 13 |
+| Total CUDA source files | 74 |
+| Unique SASS mnemonics | 264 |
+| Total SASS instructions disassembled | 26,216 |
+| Latency measurements | 70+ (ncu cross-validated) |
+| Throughput measurements | 10+ |
+| Tensor core precisions measured | 7 (all available on Ada) |
+| Exotic formats characterized | 16 (NF4, MX, FXP, Posit, BCD, DD, QD, bignum) |
+| Novel discoveries | 30+ |
+| ncu hardware counter validations | 41 kernels |
+| Production kernels created | 4 (BF16 bf162, INT8 MRT A-A, inv_tau, REDUX box count) |
+| Zero-cost modifiers confirmed | 5 (FTZ, SAT, FABS, FNEG, denormals) |
+| N/A values remaining | 0 |
+
+### Fastest instruction per pipeline (Ada Lovelace SM 8.9)
+
+| Pipeline | Fastest instruction | Latency |
+|---|---|---|
+| Integer | IABS (modifier) | 0.26 cy/pair |
+| Integer standalone | IADD3 | 2.52 cy |
+| FP32 | FFMA | 4.53 cy |
+| FP16 packed | HADD2 / HFMA2 | 4.54 cy |
+| **BF16 packed** | **HFMA2.BF16** | **4.01 cy** |
+| INT8 dot product | IDP.4A | 4.53 cy |
+| Tensor core | IMMA.8832 (INT4) | 28.05 cy |
+| Tensor core float | HMMA.16816 (FP16->FP16) | 42.14 cy |
+| Warp reduction | REDUX.SUM | 60.01 cy |
+| SFU | MUFU.EX2 | 17.55 cy |
+| FP64 | DADD | 48.47 cy |
+| Shared memory | LDS | 28.03 cy |
+
+### Most expensive operations (Ada Lovelace SM 8.9)
+
+| Operation | Latency | Category |
+|---|---|---|
+| NANOSLEEP(0) | 2685.55 cy | Warp reschedule |
+| MEMBAR.SYS | 2583.37 cy | System-scope fence |
+| FP64 log() | 1113.83 cy | Transcendental |
+| FP64 sin() | 820.66 cy | Transcendental |
+| QD FP256 ADD | 828.28 cy | Arbitrary precision |
+| DD FP128 ADD | 500.28 cy | Double-double |
+| FP64 sqrt() | 450.30 cy | Transcendental |
+| LDGSTS | 363.28 cy | Async copy overhead |
+| DD FP128 MUL | 314.35 cy | Double-double |
+| BCD ADD | 291.05 cy | Decimal arithmetic |
