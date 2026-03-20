@@ -1,0 +1,13 @@
+kernel,sm_cycles_active,instructions_executed,registers,bank_conflicts,flags,new_mnemonics
+int8_dp4a_stencil,14582.57,1114112,18,909,O3_restrict,"LDS.S8"
+int16_stencil,31365.97,2195456,19,4547,O3_restrict,"LDS.S16"
+int8_pack4,11567.65,368640,16,0,O3_restrict,"UPRMT"
+int8_coarsened,11631.43,368640,16,0,O3_restrict,""
+int64_clz,31364.25,409600,16,0,O3_restrict,"F2I.U64.TRUNC"
+int64_popc,30729.13,376832,16,0,O3_restrict,"I2F.U64.RP"
+int32_bitonic_warp,54351.50,4685824,16,1024,O3_restrict,""
+int32_compact,54066.58,1409024,16,99,O3_restrict,""
+brev_fft_permute,205.82,640,16,0,O3_restrict,""
+popc_hamming,58987.92,557056,16,0,O3_restrict,""
+iabs_l1norm,42760.77,917504,16,0,O3_restrict,""
+clz_log2,31153.18,524288,16,0,O3_restrict,""
