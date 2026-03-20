@@ -793,6 +793,24 @@ variants (UISETP.GE.U32.AND, UISETP.GT.AND) in the uniform register datapath.
 
 **Grand total: 363 unique SASS mnemonics across all 20 flag combinations.**
 
+### CRITICAL: --use_fast_math breaks throughput benchmarks
+
+`--use_fast_math` enables associativity optimizations that allow the
+compiler to constant-fold throughput measurement chains:
+
+| Benchmark | Without fast_math | With fast_math | Cause |
+|---|---|---|---|
+| HFMA2.BF16 throughput | 312.1 ops/clk/SM | **12.9** (24x regression!) | Chain folded to 1 instruction |
+| FFMA throughput | 44.6 ops/clk/SM | 85.0 (inflated) | Partial folding |
+
+The `asm volatile` pattern protects **latency** chains but NOT **throughput**
+chains (which use C++ operators for 8 independent accumulators). The compiler
+can fold `a = a * scale + bias` across iterations when fast_math grants
+associativity permission.
+
+**Rule: compare throughput benchmarks compiled WITHOUT --use_fast_math.**
+Use `--use_fast_math` only for SASS mnemonic hunting, not measurement.
+
 ---
 
 ## Definitive Summary (2026-03-19)
