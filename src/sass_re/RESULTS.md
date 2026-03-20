@@ -847,7 +847,7 @@ Use `--use_fast_math` only for SASS mnemonic hunting, not measurement.
 | Probe kernels | 61 |
 | Microbenchmarks | 13 |
 | Total CUDA source files | 74 |
-| Unique SASS mnemonics | **443** (across 262 probes, 20+ flag combinations, -G debug) |
+| Unique SASS mnemonics | **448** (across 298 probes, 20+ flag combinations, -G debug) |
 | Total SASS instructions disassembled | 26,216 |
 | Latency measurements | 70+ (ncu cross-validated) |
 | Throughput measurements | 10+ |
