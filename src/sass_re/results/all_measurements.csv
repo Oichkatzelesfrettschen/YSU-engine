@@ -1,0 +1,113 @@
+instruction,value,unit,benchmark,flags
+4 KB         1024,69.56,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+8 KB         2048,77.24,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+16 KB         4096,92.47,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+32 KB         8192,122.91,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+64 KB        16384,92.56,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+96 KB        24576,162.37,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+128 KB        32768,214.43,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+256 KB        65536,93.99,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+512 KB       131072,247.24,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+1024 KB       262144,93.01,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+2048 KB       524288,214.69,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+4096 KB      1048576,93.08,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+8192 KB      2097152,225.12,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+16384 KB      4194304,97.68,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+24576 KB      6291456,168.01,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+32768 KB      8388608,242.94,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+49152 KB     12582912,352.84,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+65536 KB     16777216,98.71,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+98304 KB     25165824,170.37,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+131072 KB     33554432,244.57,cy,microbench_cache_topology,O3_prec_nofmad_restrict
+FP8 E5M2 round-trip,18.52,cy,microbench_fill_all_na,O3_prec_nofmad_restrict
+FP4 E2M1 round-trip,135.38,cy,microbench_fill_all_na,O3_prec_nofmad_restrict
+NF4 round-trip,169.94,cy,microbench_fill_all_na,O3_prec_nofmad_restrict
+DD FP128 MUL,323.20,cy,microbench_fill_all_na,O3_prec_nofmad_restrict
+Posit<8_0> decode,167.21,cy,microbench_fill_all_na,O3_prec_nofmad_restrict
+INT128 ADD (asm chain),13.11,cy,microbench_fill_all_na,O3_prec_nofmad_restrict
+FADD,4.52,cy,microbench_latency,O3_prec_nofmad_restrict
+FMUL,4.52,cy,microbench_latency,O3_prec_nofmad_restrict
+FFMA,4.52,cy,microbench_latency,O3_prec_nofmad_restrict
+IADD3,2.50,cy,microbench_latency,O3_prec_nofmad_restrict
+IMAD,4.51,cy,microbench_latency,O3_prec_nofmad_restrict
+MUFU.RCP,41.53,cy,microbench_latency,O3_prec_nofmad_restrict
+MUFU.RSQ,39.53,cy,microbench_latency,O3_prec_nofmad_restrict
+MUFU.SIN,23.50,cy,microbench_latency,O3_prec_nofmad_restrict
+MUFU.EX2,39.53,cy,microbench_latency,O3_prec_nofmad_restrict
+MUFU.LG2,39.53,cy,microbench_latency,O3_prec_nofmad_restrict
+LOP3,4.51,cy,microbench_latency,O3_prec_nofmad_restrict
+SHF,4.50,cy,microbench_latency,O3_prec_nofmad_restrict
+PRMT,4.50,cy,microbench_latency,O3_prec_nofmad_restrict
+F2I+I2F,12.03,cy,microbench_latency,O3_prec_nofmad_restrict
+SHFL.BFLY,24.96,cy,microbench_latency,O3_prec_nofmad_restrict
+LDG chase,122.93,cy,microbench_latency,O3_prec_nofmad_restrict
+LDS chase,28.03,cy,microbench_latency,O3_prec_nofmad_restrict
+FP32<->FP16 round-trip,10.52,cy,microbench_latency_conversions,O3_prec_nofmad_restrict
+FP32<->BF16 round-trip,8.53,cy,microbench_latency_conversions,O3_prec_nofmad_restrict
+FP32<->FP8_E4M3 r/t,18.52,cy,microbench_latency_conversions,O3_prec_nofmad_restrict
+FP32<->FP64 round-trip,0.00,cy,microbench_latency_conversions,O3_prec_nofmad_restrict
+INT32<->FP32 round-trip,23.51,cy,microbench_latency_conversions,O3_prec_nofmad_restrict
+LDC chain (const mem),70.56,cy,microbench_latency_conversions,O3_prec_nofmad_restrict
+IABS (neg+abs chain),0.26,cy,microbench_latency_corrected,O3_prec_nofmad_restrict
+POPC (popc+or chain),11.76,cy,microbench_latency_corrected,O3_prec_nofmad_restrict
+FLO (flo+or chain),11.76,cy,microbench_latency_corrected,O3_prec_nofmad_restrict
+DMNMX (min+max chain),76.05,cy,microbench_latency_corrected,O3_prec_nofmad_restrict
+BREV (pure asm chain),17.50,cy,microbench_latency_corrected,O3_prec_nofmad_restrict
+FFMA IEEE (baseline),4.51,cy,microbench_latency_corrected,O3_prec_nofmad_restrict
+FFMA FTZ (flush-to-zero),4.51,cy,microbench_latency_corrected,O3_prec_nofmad_restrict
+DADD,48.47,cy,microbench_latency_expanded,O3_prec_nofmad_restrict
+DFMA,54.47,cy,microbench_latency_expanded,O3_prec_nofmad_restrict
+DMUL,48.47,cy,microbench_latency_expanded,O3_prec_nofmad_restrict
+MUFU.RCP64H,17.53,cy,microbench_latency_expanded,O3_prec_nofmad_restrict
+HADD2,4.51,cy,microbench_latency_expanded,O3_prec_nofmad_restrict
+HFMA2,4.51,cy,microbench_latency_expanded,O3_prec_nofmad_restrict
+HFMA2.BF16,4.01,cy,microbench_latency_expanded,O3_prec_nofmad_restrict
+IDP.4A,4.50,cy,microbench_latency_expanded,O3_prec_nofmad_restrict
+NANOSLEEP(0),2684.47,cy,microbench_latency_expanded,O3_prec_nofmad_restrict
+FP16 -> FP32 (HMMA.16816),66.25,cy,microbench_latency_tensor_all,O3_prec_nofmad_restrict
+FP16 -> FP16 (HMMA.16816.F16),42.11,cy,microbench_latency_tensor_all,O3_prec_nofmad_restrict
+BF16 -> FP32 (HMMA.16816.BF16),66.30,cy,microbench_latency_tensor_all,O3_prec_nofmad_restrict
+TF32 -> FP32 (HMMA.1684x2),66.66,cy,microbench_latency_tensor_all,O3_prec_nofmad_restrict
+INT8 -> INT32 (IMMA.16816.S8),34.04,cy,microbench_latency_tensor_all,O3_prec_nofmad_restrict
+INT4 -> INT32 (IMMA.8832.S4),28.04,cy,microbench_latency_tensor_all,O3_prec_nofmad_restrict
+UINT4 -> INT32 (IMMA.8832.U4),28.03,cy,microbench_latency_tensor_all,O3_prec_nofmad_restrict
+BREV,17.50,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+POPC,23.53,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+FLO(bfind),23.53,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+BFE,8.53,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+BFI,4.52,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+FSEL,8.52,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+IABS,0.52,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+DMNMX,114.64,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+MEMBAR.GPU,205.26,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+MEMBAR.SYS,2584.03,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+YIELD(nanosleep0),2662.57,cy,microbench_latency_wave5,O3_prec_nofmad_restrict
+__launch_bounds__(128_ 1)            60,2560000.0,cy,microbench_occupancy_scaling,O3_prec_nofmad_restrict
+__launch_bounds__(128_ 4)           240,1137777.7,cy,microbench_occupancy_scaling,O3_prec_nofmad_restrict
+__launch_bounds__(128_ 8)           480,417959.2,cy,microbench_occupancy_scaling,O3_prec_nofmad_restrict
+Full grid (oversubscribed)        16384,21030.7,cy,microbench_occupancy_scaling,O3_prec_nofmad_restrict
+INT64 ADD,2.54,cy,microbench_remaining_latencies,O3_prec_nofmad_restrict
+INT64 MUL,17.53,cy,microbench_remaining_latencies,O3_prec_nofmad_restrict
+FABS+FNEG (pair),0.00,cy,microbench_remaining_latencies,O3_prec_nofmad_restrict
+FADD.SAT,4.50,cy,microbench_remaining_latencies,O3_prec_nofmad_restrict
+LDGSTS (async copy/iter),363.78,cy,microbench_remaining_latencies,O3_prec_nofmad_restrict
+Stride 1 (conflict-free),53.00,cy,microbench_smem_bank_conflicts,O3_prec_nofmad_restrict
+Stride 2 (2-way),55.00,cy,microbench_smem_bank_conflicts,O3_prec_nofmad_restrict
+Stride 4 (4-way),59.00,cy,microbench_smem_bank_conflicts,O3_prec_nofmad_restrict
+Stride 8 (8-way),67.00,cy,microbench_smem_bank_conflicts,O3_prec_nofmad_restrict
+Stride 16 (16-way),83.00,cy,microbench_smem_bank_conflicts,O3_prec_nofmad_restrict
+Stride 32 (32-way),115.00,cy,microbench_smem_bank_conflicts,O3_prec_nofmad_restrict
+Broadcast (all same),27.01,cy,microbench_smem_bank_conflicts,O3_prec_nofmad_restrict
+XOR 1 (neighbor swap),27.01,cy,microbench_smem_bank_conflicts,O3_prec_nofmad_restrict
+XOR 16 (half-warp swap),27.01,cy,microbench_smem_bank_conflicts,O3_prec_nofmad_restrict
+FADD,187.4,cy,microbench_throughput,O3_prec_nofmad_restrict
+FFMA,85.6,cy,microbench_throughput,O3_prec_nofmad_restrict
+MUFU (RCP),10.1,cy,microbench_throughput,O3_prec_nofmad_restrict
+IADD3,205.3,cy,microbench_throughput,O3_prec_nofmad_restrict
+LOP3,209.1,cy,microbench_throughput,O3_prec_nofmad_restrict
+FP32+INT32 concurrent,208.1,cy,microbench_throughput,O3_prec_nofmad_restrict
+HADD2 (2xFP16),265.6,cy,microbench_throughput_expanded,O3_prec_nofmad_restrict
+IDP.4A (4xINT8),210.0,cy,microbench_throughput_expanded,O3_prec_nofmad_restrict
+HFMA2.BF16,283.7,cy,microbench_throughput_expanded,O3_prec_nofmad_restrict
+DADD,1.7,cy,microbench_throughput_expanded,O3_prec_nofmad_restrict
+DFMA,1.7,cy,microbench_throughput_expanded,O3_prec_nofmad_restrict
