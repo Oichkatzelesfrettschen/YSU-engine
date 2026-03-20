@@ -670,6 +670,84 @@ kernels use only the default `FFMA` (round to nearest even).
 
 ---
 
+## Optimization Flag SASS Mnemonic Mining
+
+Systematic compilation of all 60 probes across 13 flag combinations to
+discover optimization-dependent SASS instruction variants.
+
+### Flag sweep results
+
+| Flags | Compiled | Mnemonics | New vs baseline | Key findings |
+|---|---|---|---|---|
+| (default) | 60 | 268 | -- | Baseline |
+| -O1 | 60 | 268 | 0 | Identical to default |
+| -O2 | 60 | 268 | 0 | Identical to default |
+| -O3 | 60 | 268 | 0 | Identical to default |
+| -Xptxas -O3 | 60 | 268 | 0 | PTX optimizer level has no effect |
+| **--use_fast_math** | 60 | 259 | **+13** | FTZ variants + MUFU.SQRT + P2R |
+| --extra-device-vectorization | 60 | 268 | 0 | No effect (probes already vectorized) |
+| **--restrict** | 60 | 271 | **+5** | Constant-cache sub-byte loads + spills |
+| -O3 --use_fast_math | 60 | 259 | +13 | Same as fast_math alone |
+| -O3 --extra-device-vectorization | 60 | 268 | 0 | No effect |
+| -O3 --restrict | 60 | 271 | +5 | Same as restrict alone |
+| -O3 --use_fast_math --extra-device-vectorization | 60 | 259 | +13 | fast_math dominates |
+| -O3 --use_fast_math --extra-device-vectorization --restrict | 60 | 259 | +13 | fast_math dominates |
+| -dlto | 0 | -- | -- | Requires device-link model (N/A for single-file) |
+
+Note: `-O1` through `-O3` produce identical SASS because `asm volatile` +
+volatile stores prevent the ptxas optimizer from eliminating measurement chains.
+
+### New mnemonics from `--use_fast_math` (13 new)
+
+| Mnemonic | Description | Significance |
+|---|---|---|
+| F2I.FTZ.CEIL.NTZ | Float-to-int: FTZ + ceiling | FTZ conversion variants |
+| F2I.FTZ.FLOOR.NTZ | Float-to-int: FTZ + floor | |
+| F2I.FTZ.NTZ | Float-to-int: FTZ nearest | |
+| F2I.FTZ.TRUNC.NTZ | Float-to-int: FTZ + truncation | |
+| F2I.FTZ.U32.NTZ | Float-to-unsigned-int: FTZ | |
+| FADD.FTZ.RZ | FP32 add: FTZ + round-toward-zero | Combined modifier |
+| FMNMX.FTZ | FP32 min/max with FTZ | |
+| FMUL.FTZ.D8 | FP32 multiply: FTZ + D8 scale | |
+| FSET.BF.GT.FTZ.AND | Float set (boolean): FTZ | |
+| FSETP.GE.FTZ.AND | Float set-predicate: FTZ | |
+| FSETP.GT.FTZ.AND | Float set-predicate: FTZ | |
+| **MUFU.SQRT** | **Hardware square root SFU path** | **Only emitted with fast_math!** |
+| **P2R** | **Predicate-to-register (spill)** | **Proves predicate spilling CAN occur** |
+
+**MUFU.SQRT discovery**: Without `--use_fast_math`, `sqrtf()` compiles to
+`MUFU.RSQ` + `FMUL` (reciprocal sqrt * x). Fast math enables a direct
+`MUFU.SQRT` instruction. This is a different SFU opcode from `MUFU.RSQ`.
+
+**P2R discovery**: We previously reported that predicate spilling never occurs
+(probe_predicate_pressure.cu). This is true at default optimization, but
+`--use_fast_math` generates FTZ predicate chains complex enough to trigger
+P2R (predicate-to-register spill). The complementary R2P (register-to-predicate
+reload) should also exist but was not observed in this sweep.
+
+### New mnemonics from `--restrict` (5 new)
+
+| Mnemonic | Description | Significance |
+|---|---|---|
+| I2F.S8 | Direct signed-byte to float | Skips INT32 widening step |
+| LDG.E.U16.CONSTANT | 16-bit unsigned read-only load | __restrict__ enables constant cache |
+| LDG.E.U8.CONSTANT | 8-bit unsigned read-only load | __restrict__ enables constant cache |
+| **LDL.LU** | **Local memory load (uniform hint)** | **Register spill to LMEM** |
+| **STL** | **Local memory store** | **Register spill to LMEM** |
+
+**LDL.LU + STL discovery**: `--restrict` changes pointer aliasing, causing
+the compiler to allocate more registers for pointer disambiguation. This
+pushes some kernels over the register limit, triggering LMEM spills.
+LDL.LU (load local, uniform) is the spill reload path; STL is the spill store.
+These are the instructions that `check_spills.sh` warns about.
+
+### Combined total
+
+**286 unique SASS mnemonics** across all optimization flag combinations
+(268 baseline + 13 from fast_math + 5 from restrict = 286 total).
+
+---
+
 ## Definitive Summary (2026-03-19)
 
 | Metric | Value |
@@ -677,7 +755,7 @@ kernels use only the default `FFMA` (round to nearest even).
 | Probe kernels | 61 |
 | Microbenchmarks | 13 |
 | Total CUDA source files | 74 |
-| Unique SASS mnemonics | 264 |
+| Unique SASS mnemonics | **286** (268 baseline + 18 from fast_math/restrict) |
 | Total SASS instructions disassembled | 26,216 |
 | Latency measurements | 70+ (ncu cross-validated) |
 | Throughput measurements | 10+ |
