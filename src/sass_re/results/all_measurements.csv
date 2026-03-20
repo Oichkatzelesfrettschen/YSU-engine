@@ -111,3 +111,17 @@ IDP.4A (4xINT8),210.0,cy,microbench_throughput_expanded,O3_prec_nofmad_restrict
 HFMA2.BF16,283.7,cy,microbench_throughput_expanded,O3_prec_nofmad_restrict
 DADD,1.7,cy,microbench_throughput_expanded,O3_prec_nofmad_restrict
 DFMA,1.7,cy,microbench_throughput_expanded,O3_prec_nofmad_restrict
+5pt_stencil_16x16_r1,0.009,ms,microbench_tiling,O3_prec_nofmad_restrict
+9pt_stencil_16x16_r1,0.013,ms,microbench_tiling,O3_prec_nofmad_restrict
+25pt_stencil_16x16_r2,0.024,ms,microbench_tiling,O3_prec_nofmad_restrict
+3D_8x8x4_tile_7pt_64cube,0.005,ms,microbench_tiling,O3_prec_nofmad_restrict
+RegTile_1x1_baseline,0.005,ms,microbench_tiling,O3_prec_nofmad_restrict
+RegTile_2x1_float2,0.004,ms,microbench_tiling,O3_prec_nofmad_restrict
+RegTile_4x1_float4,0.004,ms,microbench_tiling,O3_prec_nofmad_restrict
+RegTile_2x2_GEMM_256cube,0.001,ms,microbench_tiling,O3_prec_nofmad_restrict
+RegTile_4x4_GEMM_256cube,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
+LBM_2cell_coarsened_1M,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
+SMEM_row_major_conflicts,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
+SMEM_padded_no_conflicts,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
+SMEM_XOR_swizzled,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
+SMEM_transpose_padded,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
