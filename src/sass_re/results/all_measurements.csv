@@ -137,3 +137,9 @@ smem_atomic_int32_zero_contention,4.13,cy,edge_atomic_latency,O3_restrict
 smem_atomic_int32_32way_contention,4.14,cy,edge_atomic_latency,O3_restrict
 smem_atomic_int32_single_thread,4.19,cy,edge_atomic_latency,O3_restrict
 smem_atomic_fp32_single_thread,91.50,cy,edge_atomic_latency,O3_restrict
+ATOMS.ADD_INT32,4.27,cy,atoms_latency_sweep,O3
+ATOMS.ADD_UINT32,4.26,cy,atoms_latency_sweep,O3
+ATOMS.ADD_FP32,91.58,cy,atoms_latency_sweep,O3
+ATOMS.ADD_INT64,106.60,cy,atoms_latency_sweep,O3
+ATOMS.MIN_INT32,4.37,cy,atoms_latency_sweep,O3
+ATOMS.CAS_INT32,36.26,cy,atoms_latency_sweep,O3

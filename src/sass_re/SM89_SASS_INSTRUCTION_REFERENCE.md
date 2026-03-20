@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 398 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 405 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -50,8 +50,12 @@ Latency notation:
 | `RED.E.ADD.STRONG.GPU` |  | default | |
 | `RED.E.MAX.S32.STRONG.GPU` |  | shared atomics probes | Global reduction max (signed INT32, strong ordering) |
 | `RED.E.ADD.F32.FTZ.RN.STRONG.SYS` |  | system-scope probes | **System-scope float reduction** (cross-GPU/CPU visible FP32 atomicAdd) |
+| `RED.E.DEC.STRONG.GPU` |  | atomic sweep probes | **Global reduction wrapping decrement** with strong ordering |
+| `RED.E.INC.STRONG.GPU` |  | atomic sweep probes | **Global reduction wrapping increment** with strong ordering |
 | `RED.E.MIN.S32.STRONG.GPU` |  | shared atomics probes | Global reduction min (signed INT32, strong ordering) |
 | `REDUX` |  | shared atomics probes | Bare warp reduction (no type suffix, compiler-selected) |
+| `REDUX.MAX` |  | atomic sweep probes | Warp-level max (bare, without .S32 suffix) |
+| `REDUX.MIN` |  | atomic sweep probes | Warp-level min (bare, without .S32 suffix) |
 | `REDUX.MAX.S32` | ~60 cy | default | |
 | `REDUX.MIN.S32` | ~60 cy | default | |
 | `REDUX.OR` |  | default | |
@@ -67,7 +71,10 @@ Latency notation:
 | `ATOMS.CAS.64` |  | shared atomics probes | **Shared memory 64-bit CAS.** For 64-bit lock-free updates in smem. |
 | `ATOMS.CAST.SPIN` |  | -G | Debug spin-lock CAS loop |
 | `ATOMS.CAST.SPIN.64` |  | -G | Debug 64-bit spin-lock |
-| `ATOMS.EXCH` |  | shared atomics probes | **Shared memory exchange.** Atomically replaces smem value, returns old value. Used for last-writer-wins patterns. |
+| `ATOMS.DEC` |  | atomic sweep probes | **Shared memory wrapping decrement.** atomicDec: (old==0 or old>limit) ? limit : old-1. |
+| `ATOMS.EXCH` |  | shared atomics probes | **Shared memory exchange.** Atomically replaces smem value, returns old value. |
+| `ATOMS.INC` |  | atomic sweep probes | **Shared memory wrapping increment.** atomicInc: (old>=limit) ? 0 : old+1. |
+| `ATOMS.MIN.S32` | 4.37 cy (single thread) | atomic sweep probes | **Shared memory signed minimum.** Nearly same latency as ATOMS.ADD (4.27 cy). |
 | `ATOMS.POPC.INC.32` |  | default | |
 
 ### Barrier/Sync (3 mnemonics)
@@ -544,7 +551,7 @@ Latency notation:
 
 ---
 
-**Total: 398 unique SASS mnemonics across 25 categories.**
+**Total: 405 unique SASS mnemonics across 25 categories.**
 
 All latencies measured on RTX 4070 Ti (SM 8.9, 2625 MHz, 60 SMs).
 See `RESULTS.md` for measurement methodology, ncu cross-validation,
