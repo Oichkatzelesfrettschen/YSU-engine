@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 446 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 448 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -472,7 +472,7 @@ Latency notation:
 | `STL` |  | local memory store (spill) | --restrict / -G | |
 | `STL.64` |  | local memory store (spill) | default | |
 
-### Memory Shared (9 mnemonics)
+### Memory Shared (11 mnemonics)
 
 | Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
 |---|---|---|---|---|
@@ -484,6 +484,7 @@ Latency notation:
 | `LDS.U8` |  | shared memory load | bitops tiling probes | Unsigned 8-bit shared memory load. |
 | `LDS.U16` |  | shared memory load | edge atomics probes | Unsigned 16-bit shared memory load. |
 | `STS` |  | shared memory store | default | |
+| `STS.U8` |  | shared memory byte store | data movement probes | **Unsigned 8-bit shared memory store.** Sub-byte smem write. |
 | `STS.64` |  | shared memory store | -O3 no-restrict | 64-bit shared memory store (without --restrict) |
 | `STS.U16` |  | shared memory store | default | |
 
@@ -581,7 +582,8 @@ Latency notation:
 | `UPRMT` |  |  | INT8 tiling probes | **Uniform byte permute.** Uniform datapath equivalent of PRMT. Used for warp-uniform byte shuffle in INT8 pack/unpack patterns. |
 | `USHF.R.S32.HI` |  |  | default | |
 | `USHF.R.U32.HI` |  |  | bitops tiling probes | Uniform unsigned right shift high |
-| `ULEA` | ~2.5 cy (uniform pipeline) |  | tiling probes (-O3 --restrict) | Uniform load effective address for tile base computation. Opcode 0x7891. |
+| `ULEA` | ~2.5 cy (uniform pipeline) |  | tiling probes | Uniform load effective address. Opcode 0x7891. |
+| `ULEA.HI` |  |  | data movement probes | **Uniform LEA high.** Upper 32 bits of 64-bit uniform address computation. |
 
 ### Warp Vote/Match/Redux (7 mnemonics)
 
@@ -597,7 +599,7 @@ Latency notation:
 
 ---
 
-**Total: 446 unique SASS mnemonics across 25 categories.**
+**Total: 448 unique SASS mnemonics across 25 categories.**
 
 All latencies measured on RTX 4070 Ti (SM 8.9, 2625 MHz, 60 SMs).
 See `RESULTS.md` for measurement methodology, ncu cross-validation,
