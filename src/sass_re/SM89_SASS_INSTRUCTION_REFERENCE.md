@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 364 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 370 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -24,6 +24,7 @@ Latency notation:
 | Mnemonic | Measured Latency | Flags | Notes |
 |---|---|---|---|
 | `ATOM.E.ADD.64.STRONG.GPU` |  | default | |
+| `ATOMG.E.ADD.STRONG.GPU` |  | barrier probes (-O3 --restrict) | Global atomic add with strong ordering (G = global scope) |
 | `ATOM.E.ADD.F32.FTZ.RN.STRONG.GPU` |  | default | |
 | `ATOM.E.ADD.STRONG.GPU` |  | default | |
 | `ATOM.E.AND.STRONG.GPU` |  | default | |
@@ -60,6 +61,7 @@ Latency notation:
 
 | Mnemonic | Measured Latency | Flags | Notes |
 |---|---|---|---|
+| `BAR.ARV` |  | barrier probes (-O3 --restrict) | **Split-phase arrive-without-wait.** Thread signals arrival but continues executing. Paired with BAR.SYNC for deferred wait. |
 | `BAR.SYNC` |  | default | |
 | `BAR.SYNC.DEFER_BLOCKING` |  | default | |
 | `DEPBAR.LE` |  | default | |
@@ -111,6 +113,8 @@ Latency notation:
 | `BMOV.32` |  | -G | |
 | `BMOV.32.CLEAR` |  | -G | |
 | `BRA` |  | default | |
+| `BRA.CONV` |  | barrier probes | **Convergent branch** (compiler marks branches where all threads take same path) |
+| `BRA.DIV` |  | barrier probes | **Divergent branch** (compiler marks branches where threads may diverge) |
 | `BRA.CONV` |  | default | |
 | `BRX` |  | default | |
 | `BSSY` |  | default | |
@@ -489,6 +493,8 @@ Latency notation:
 | `UIMAD.WIDE.U32` |  | default | |
 | `UISETP.GE.U32.AND` |  | --maxrregcount | |
 | `UISETP.GT.AND` |  | --maxrregcount | |
+| `UISETP.NE.U32.AND` |  | barrier probes | Uniform unsigned not-equal set-predicate |
+| `USEL` |  | barrier probes | **Uniform conditional select** (uniform datapath equivalent of SEL) |
 | `ULOP3.LUT` |  | default | |
 | `UMOV` |  | default | |
 | `UPOPC` |  | default | |
