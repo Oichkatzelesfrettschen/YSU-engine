@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 443 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 446 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -200,8 +200,11 @@ Latency notation:
 | `F2FP.SATFINITE.E4M3.F32.PACK_AB_MERGE_C` | ~18.54 cy (FP8 round-trip) | format conversion | default | |
 | `F2FP.SATFINITE.E5M2.F32.PACK_AB_MERGE_C` | ~18.53 cy (FP8 E5M2 round-trip) | format conversion | default | |
 | `F2I.CEIL.NTZ` |  | float-to-int cast | default | |
-| `F2I.F64` |  | float-to-int cast | default | |
-| `F2I.FLOOR.NTZ` |  | float-to-int cast | default | |
+| `F2I.F64` |  | (int)double | default | |
+| `F2I.F64.TRUNC` |  | (int)double [truncate] | -G debug | **FP64->INT32 truncation** |
+| `F2I.FLOOR.NTZ` |  | (int)floorf() | default | |
+| `F2I.S64.F64.TRUNC` |  | (long long)double | -G debug | **FP64->INT64 truncation** |
+| `F2I.U32.F64.TRUNC` |  | (unsigned)fabs(double) | -G debug | **FP64->UINT32 truncation** |
 | `F2I.FTZ.CEIL.NTZ` |  | float-to-int cast | default | |
 | `F2I.FTZ.FLOOR.NTZ` |  | float-to-int cast | default | |
 | `F2I.FTZ.NTZ` |  | float-to-int cast | default | |
@@ -594,7 +597,7 @@ Latency notation:
 
 ---
 
-**Total: 443 unique SASS mnemonics across 25 categories.**
+**Total: 446 unique SASS mnemonics across 25 categories.**
 
 All latencies measured on RTX 4070 Ti (SM 8.9, 2625 MHz, 60 SMs).
 See `RESULTS.md` for measurement methodology, ncu cross-validation,
