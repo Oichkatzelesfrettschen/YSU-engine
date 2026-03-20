@@ -741,10 +741,57 @@ pushes some kernels over the register limit, triggering LMEM spills.
 LDL.LU (load local, uniform) is the spill reload path; STL is the spill store.
 These are the instructions that `check_spills.sh` warns about.
 
-### Combined total
+### Combined total (flag sweep only: fast_math + restrict)
 
-**286 unique SASS mnemonics** across all optimization flag combinations
+**286 unique SASS mnemonics** across fast_math and restrict flag combinations
 (268 baseline + 13 from fast_math + 5 from restrict = 286 total).
+
+### Comprehensive Flag Matrix Sweep (20 combos x 60 probes = 1200 compilations)
+
+| Flags | Compiled | Mnemonics | New | Spills | Key discovery |
+|---|---|---|---|---|---|
+| baseline (-std=c++20 -lineinfo) | 60 | 268 | -- | 0 | Reference |
+| -O1 / -O2 / -O3 | 60 | 268 | 0 | 0 | Identical (asm volatile proof) |
+| -fmad=false | 60 | 268 | **+1** | 0 | **HMUL2** (FMA decomposed to MUL+ADD) |
+| --use_fast_math | 60 | 259 | **+13** | 0 | MUFU.SQRT, P2R, 11 FTZ variants |
+| --maxrregcount=32-255 | 60 | 270 | **+2** | 0 | UISETP.GE.U32.AND, UISETP.GT.AND |
+| **-G (debug)** | 60 | 255 | **+76** | **892** | **76 new mnemonics + massive spills** |
+| --restrict | 60 | 271 | **+5** | 24 | LDL.LU, STL, constant-cache sub-byte |
+| -O3 precision flags | 60 | 268 | +1 | 0 | HMUL2 |
+| -O3 --fast_math --restrict | 60 | 260 | +16 | 0 | Combined set |
+| -Xptxas -warn-spills | 60 | 268 | 0 | 0 | Warning only, no SASS change |
+| -Xptxas -warn-double-usage | 60 | 268 | 0 | 0 | Warning only, no SASS change |
+
+### Debug build (-G) reveals 76 hidden instruction variants
+
+The `-G` (device debug) flag disables optimization entirely, exposing
+instructions that ptxas normally optimizes away. 76 new mnemonics appear:
+
+- **ATOMS.CAST.SPIN / .SPIN.64**: Shared-memory spin-lock atomics (debug CAS loop)
+- **BMOV.32 / BMOV.32.CLEAR**: Convergence barrier move/clear
+- **BMSK**: Bit mask generation instruction (normally folded into LOP3)
+- **IMMA.*.SAT**: Saturating tensor MMA variants (IMMA.16816.S8.SAT, IMMA.8832.S4/U4.SAT)
+- **LDGSTS.E.*.ZFILL**: Async copy with zero-fill (64-bit, 128-bit bypass)
+- **MOVM.16.MT88**: Matrix move via shared memory (tensor core data staging)
+- **QSPC.E.G / QSPC.E.S**: Query address space (global / shared)
+- **R2UR**: Register to uniform-register (reverse of S2UR)
+- **WARPSYNC.EXCLUSIVE**: Exclusive warp synchronization mode
+- **MEMBAR.SC.VC**: Sequential consistency fence with virtual channel
+- **F2F.BF16.F32 / F2F.F16.F32**: Direct format-to-format conversions
+- **76 total new mnemonics** (full list in results/flag_sweep/debug_G/)
+
+### -fmad=false reveals HMUL2
+
+When FMA fusion is disabled, `a*b+c` decomposes to separate multiply + add:
+FP16: `HFMA2` -> `HMUL2` + `HADD2` (2 instructions instead of 1).
+This is the only way to observe the standalone `HMUL2` instruction.
+
+### --maxrregcount reveals UISETP
+
+Register pressure constraints expose unsigned uniform integer set-predicate
+variants (UISETP.GE.U32.AND, UISETP.GT.AND) in the uniform register datapath.
+
+**Grand total: 363 unique SASS mnemonics across all 20 flag combinations.**
 
 ---
 
@@ -755,7 +802,7 @@ These are the instructions that `check_spills.sh` warns about.
 | Probe kernels | 61 |
 | Microbenchmarks | 13 |
 | Total CUDA source files | 74 |
-| Unique SASS mnemonics | **286** (268 baseline + 18 from fast_math/restrict) |
+| Unique SASS mnemonics | **363** (268 baseline + 95 from 20 flag combinations) |
 | Total SASS instructions disassembled | 26,216 |
 | Latency measurements | 70+ (ncu cross-validated) |
 | Throughput measurements | 10+ |
