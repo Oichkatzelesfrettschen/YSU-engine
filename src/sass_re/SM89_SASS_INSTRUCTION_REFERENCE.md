@@ -101,12 +101,16 @@ Latency notation:
 | `ATOMS.MIN.S32` | 4.37 cy (single thread) | atomicMin(shared) | atomic sweep probes | **Shared memory signed minimum.** Nearly same latency as ATOMS.ADD (4.27 cy). |
 | `ATOMS.POPC.INC.32` |  |  | default | |
 
-### Barrier/Sync (3 mnemonics)
+### Barrier/Sync (8 mnemonics)
 
 | Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
 |---|---|---|---|---|
-| `BAR.ARV` |  | bar.arrive (PTX) | barrier probes (-O3 --restrict) | **Split-phase arrive-without-wait.** Thread signals arrival but continues executing. Paired with BAR.SYNC for deferred wait. |
-| `BAR.SYNC` |  | __syncthreads() | default | |
+| `B2R.RESULT` |  | __syncthreads_count() [result] | barrier probes | **Barrier-to-register.** Reads BAR.RED reduction result into a GPR. |
+| `BAR.ARV` |  | bar.arrive (PTX) | barrier probes | **Split-phase arrive-without-wait.** |
+| `BAR.RED.AND.DEFER_BLOCKING` |  | __syncthreads_and() | barrier probes | **Barrier + AND predicate reduction** across all threads in block. |
+| `BAR.RED.OR.DEFER_BLOCKING` |  | __syncthreads_or() | barrier probes | **Barrier + OR predicate reduction.** |
+| `BAR.RED.POPC.DEFER_BLOCKING` |  | __syncthreads_count() | barrier probes | **Barrier + population count reduction** (count threads with pred=true). |
+| `BAR.SYNC` | 35.01 cy | __syncthreads() | default | Block-level barrier. |
 | `BAR.SYNC.DEFER_BLOCKING` |  | __syncthreads() | default | |
 | `DEPBAR.LE` |  | dependency barrier | default | |
 
@@ -122,6 +126,12 @@ Latency notation:
 | `PLOP3.LUT` |  |  | default | |
 | `POPC` | ~7-8 cy (multi-cycle INT, corrected from 23.52) | __popc() | default | |
 | `PRMT` | 4.52 cy | __byte_perm() | default | |
+| `PRMT.B4E` |  | __byte_perm() mode B4E | bitmanip probes | **Byte-4 extract** permute mode. |
+| `PRMT.ECL` |  | __byte_perm() mode ECL | bitmanip probes | **Edge clamp left** permute mode. |
+| `PRMT.ECR` |  | __byte_perm() mode ECR | bitmanip probes | **Edge clamp right** permute mode. |
+| `PRMT.F4E` |  | __byte_perm() mode F4E | bitmanip probes | **Four-byte extract** (funnel shift by bytes). |
+| `PRMT.RC16` |  | __byte_perm() mode RC16 | bitmanip probes | **Replicate 16-bit** to both halves. |
+| `PRMT.RC8` |  | __byte_perm() mode RC8 | bitmanip probes | **Replicate 8-bit** to all 4 bytes. |
 | `SGXT` |  | sign extend | default | |
 | `SGXT.U32` |  | sign extend | default | |
 | `SHF.L.U32` | 4.52 cy | __funnelshift_l()/__funnelshift_r() | default | |
@@ -414,6 +424,8 @@ Latency notation:
 | `LDG.E.64.CONSTANT` | ~92-123 (similar) | global load (default) | default | |
 | `LDG.E.64.STRONG.SYS` | ~92-123 (similar) | global load (default) | default | |
 | `LDG.E.CONSTANT` | ~33 cy (L1 read-only cache) | __ldg() | default | |
+| `LDG.E.EF` |  | ld.global.cs (streaming) | cache probes | **Global load evict-first.** Streaming read hint, matching STG.E.EF for stores. |
+| `LDG.E.LU` |  | ld.global.lu (last-use) | cache probes | **Global load last-use.** Evict from cache after this read. |
 | `LDG.E.S16` | ~92-123 (similar) | global load (default) | default | |
 | `LDG.E.S8` | ~92-123 (similar) | global load (default) | default | |
 | `LDG.E.STRONG.SYS` | ~92-123 (similar) | global load (default) | default | |
@@ -441,6 +453,7 @@ Latency notation:
 | `STG.E.64` |  | global store | default | |
 | `STG.E.64.STRONG.SYS` |  | global store | default | |
 | `STG.E.EF` | ~4 cy issue (evict-first, async) | __stcs() (evict-first) | default | |
+| `STG.E.STRONG.SM` |  | global store (SM scope) | cache probes | **SM-scope strong store.** Weaker than GPU-scope, only visible within the SM. |
 | `STG.E.STRONG.SYS` |  | global store | default | |
 | `STG.E.U16` |  | global store | default | |
 | `STG.E.U16.STRONG.SYS` |  | global store | default | |
@@ -471,16 +484,22 @@ Latency notation:
 | `STS.64` |  | shared memory store | -O3 no-restrict | 64-bit shared memory store (without --restrict) |
 | `STS.U16` |  | shared memory store | default | |
 
+### SIMD Video (1 mnemonic)
+
+| Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
+|---|---|---|---|---|
+| `VABSDIFF4.U8` |  | __vabsdiffu4() | SIMD video probes | **Packed INT8x4 absolute difference.** First and only "V" (video) instruction on Ada. All other SIMD video intrinsics decompose to standard IADD3/LOP3/PRMT. |
+
 ### Other (6 mnemonics)
 
 | Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
 |---|---|---|---|---|
-| `BPT.TRAP` |  |  | default | |
-| `ERRBAR` |  |  | default | |
-| `FRND` |  |  | default | |
-| `FRND.FLOOR` |  |  | default | |
-| `FRND.TRUNC` |  |  | default | |
-| `NANOSLEEP` |  | __nanosleep() | default | |
+| `BPT.TRAP` |  | debug breakpoint | default | |
+| `ERRBAR` |  | error barrier | default | |
+| `FRND` |  | roundf() | default | |
+| `FRND.FLOOR` |  | floorf() | default | |
+| `FRND.TRUNC` |  | truncf() | default | |
+| `NANOSLEEP` | 2685 cy | __nanosleep() | default | Timer-independent warp reschedule overhead |
 
 ### SFU (MUFU) (9 mnemonics)
 

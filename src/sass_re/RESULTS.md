@@ -816,7 +816,9 @@ This is the only way to observe the standalone `HMUL2` instruction.
 Register pressure constraints expose unsigned uniform integer set-predicate
 variants (UISETP.GE.U32.AND, UISETP.GT.AND) in the uniform register datapath.
 
-**Grand total: 363 unique SASS mnemonics across all 20 flag combinations.**
+**Grand total: 443 unique SASS mnemonics** across all flag combinations,
+262 probe kernels, and 15+ microbenchmarks. See `SM89_SASS_INSTRUCTION_REFERENCE.md`
+for the complete catalog with CUDA/PTX intrinsic mappings.
 
 ### CRITICAL: --use_fast_math breaks throughput benchmarks
 
@@ -845,7 +847,7 @@ Use `--use_fast_math` only for SASS mnemonic hunting, not measurement.
 | Probe kernels | 61 |
 | Microbenchmarks | 13 |
 | Total CUDA source files | 74 |
-| Unique SASS mnemonics | **363** (268 baseline + 95 from 20 flag combinations) |
+| Unique SASS mnemonics | **443** (across 262 probes, 20+ flag combinations, -G debug) |
 | Total SASS instructions disassembled | 26,216 |
 | Latency measurements | 70+ (ncu cross-validated) |
 | Throughput measurements | 10+ |
