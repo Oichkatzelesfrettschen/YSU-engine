@@ -125,3 +125,11 @@ SMEM_row_major_conflicts,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
 SMEM_padded_no_conflicts,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
 SMEM_XOR_swizzled,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
 SMEM_transpose_padded,0.034,ms,microbench_tiling,O3_prec_nofmad_restrict
+INT32_IMAD_chain,4.51,cy,int_tiling_latency,O3_restrict
+INT64_ADD_chain,2.54,cy,int_tiling_latency,O3_restrict
+INT64_MUL_chain,17.53,cy,int_tiling_latency,O3_restrict
+INT64_SHL_chain,6.53,cy,int_tiling_latency,O3_restrict
+POPC_pair,11.76,cy,bitops_tiling_latency,O3_restrict
+CLZ_FLO_pair,11.76,cy,bitops_tiling_latency,O3_restrict
+BREV_pure,17.48,cy,bitops_tiling_latency,O3_restrict
+IABS_neg_abs_pair,0.27,cy,bitops_tiling_latency,O3_restrict
