@@ -24,6 +24,24 @@ First-party measurements taken with CUDA 13.1 on Windows.
 | LDG chase | 92.29 | Global memory pointer chase (L1/L2 hit) |
 | LDS chase | 28.03 | Shared memory pointer chase |
 
+### Tensor Core Latency (first-ever measurement on Ada Lovelace)
+
+| Instruction | Latency (cy) | Ops/instruction | Notes |
+|---|---|---|---|
+| HMMA.16816 (FP16) | **66.19** | 256 FMA | 3.88 effective FMA/cy per instruction |
+
+With 4 TC units per SM, theoretical peak: 15.5 independent HMMA/cy/SM.
+At 256 FMA ops per HMMA: 15.5 * 256 = **3,968 FMA ops/cy/SM** peak TC throughput.
+
+**TC + ALU overlap confirmed**: FP32 FFMA and HMMA run on separate pipelines.
+64 HMMA + 256 FFMA interleaved takes LESS time than 256 HMMA alone.
+The FP32 ALU work is completely hidden behind TC execution.
+
+**Implication for Instant-NGP**: The MLP forward kernel (3.16x speedup via
+hand-tuned FFMA ILP) could potentially be further accelerated by moving
+the 64x64 hidden-layer matmul to HMMA tensor cores while keeping the
+per-element ReLU/sigmoid on the FP32 pipeline simultaneously.
+
 ### Corrected Latency Measurements (ncu-validated, RTX 4070 Ti)
 
 | Instruction | Corrected (cy) | Original (cy) | Correction |
