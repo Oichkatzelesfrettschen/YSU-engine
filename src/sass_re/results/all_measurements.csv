@@ -133,3 +133,7 @@ POPC_pair,11.76,cy,bitops_tiling_latency,O3_restrict
 CLZ_FLO_pair,11.76,cy,bitops_tiling_latency,O3_restrict
 BREV_pure,17.48,cy,bitops_tiling_latency,O3_restrict
 IABS_neg_abs_pair,0.27,cy,bitops_tiling_latency,O3_restrict
+smem_atomic_int32_zero_contention,4.13,cy,edge_atomic_latency,O3_restrict
+smem_atomic_int32_32way_contention,4.14,cy,edge_atomic_latency,O3_restrict
+smem_atomic_int32_single_thread,4.19,cy,edge_atomic_latency,O3_restrict
+smem_atomic_fp32_single_thread,91.50,cy,edge_atomic_latency,O3_restrict

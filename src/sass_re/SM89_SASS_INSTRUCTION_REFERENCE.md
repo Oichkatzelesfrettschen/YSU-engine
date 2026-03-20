@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 388 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 391 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -35,6 +35,7 @@ Latency notation:
 | `ATOM.E.OR.STRONG.GPU` |  | default | |
 | `ATOM.E.XOR.STRONG.GPU` |  | default | |
 | `ATOMG.E.AND.STRONG.GPU` |  | default | |
+| `ATOMG.E.CAS.64.STRONG.GPU` |  | edge atomics probes | **64-bit global CAS with strong ordering.** For lock-free double-precision shared atomic accumulation. |
 | `ATOMG.E.CAS.STRONG.GPU` |  | default | |
 | `ATOMG.E.EXCH.STRONG.GPU` |  | default | |
 | `ATOMG.E.MAX.S32.STRONG.GPU` |  | default | |
@@ -200,6 +201,7 @@ Latency notation:
 | `HMMA.16816.F32.BF16` | 66.33 cy/WMMA (=FP16->FP32) | default | |
 | `HMMA.1684.F32.TF32` | 66.66 cy/2xHMMA (TF32 via 2 instructions) | default | |
 | `HMNMX2` |  | default | |
+| `HSETP2.GTU.AND` |  | edge atomics probes | **Half2 packed comparison set-predicate** (greater-than-unordered, AND combiner). FP16 packed comparison -- first observation. |
 | `HMUL2` | ~4.54 cy (only with -fmad=false) | -fmad=false | |
 
 ### FP32 Arithmetic (42 mnemonics)
@@ -427,6 +429,7 @@ Latency notation:
 | `LDS.S8` |  | INT8 tiling probes | **Signed 8-bit shared memory load.** Sign-extends byte to 32-bit register. First sub-byte signed smem load observed. |
 | `LDS.S16` |  | INT16 tiling probes | **Signed 16-bit shared memory load.** Sign-extends short to 32-bit register. |
 | `LDS.U8` |  | bitops tiling probes | Unsigned 8-bit shared memory load. |
+| `LDS.U16` |  | edge atomics probes | Unsigned 16-bit shared memory load. |
 | `STS` |  | default | |
 | `STS.U16` |  | default | |
 
@@ -534,7 +537,7 @@ Latency notation:
 
 ---
 
-**Total: 388 unique SASS mnemonics across 25 categories.**
+**Total: 391 unique SASS mnemonics across 25 categories.**
 
 All latencies measured on RTX 4070 Ti (SM 8.9, 2625 MHz, 60 SMs).
 See `RESULTS.md` for measurement methodology, ncu cross-validation,
