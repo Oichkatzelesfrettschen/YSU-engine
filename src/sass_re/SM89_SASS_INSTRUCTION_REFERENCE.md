@@ -1,6 +1,6 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 391 SASS mnemonics observed on NVIDIA Ada Lovelace
+Definitive inventory of all 398 SASS mnemonics observed on NVIDIA Ada Lovelace
 SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
 
 - Generated: 2026-03-19
@@ -35,7 +35,10 @@ Latency notation:
 | `ATOM.E.OR.STRONG.GPU` |  | default | |
 | `ATOM.E.XOR.STRONG.GPU` |  | default | |
 | `ATOMG.E.AND.STRONG.GPU` |  | default | |
+| `ATOM.E.CAS.64.STRONG.GPU` |  | -G debug + expanded probes | 64-bit global CAS with strong GPU ordering |
 | `ATOMG.E.CAS.64.STRONG.GPU` |  | edge atomics probes | **64-bit global CAS with strong ordering.** For lock-free double-precision shared atomic accumulation. |
+| `ATOMG.E.CAS.STRONG.SYS` |  | system-scope probes | **System-scope CAS** (cross-GPU/CPU visible atomics) |
+| `ATOMG.E.EXCH.STRONG.SYS` |  | system-scope probes | **System-scope exchange** (CPU-visible atomic swap) |
 | `ATOMG.E.CAS.STRONG.GPU` |  | default | |
 | `ATOMG.E.EXCH.STRONG.GPU` |  | default | |
 | `ATOMG.E.MAX.S32.STRONG.GPU` |  | default | |
@@ -46,6 +49,7 @@ Latency notation:
 | `RED.E.ADD.F32.FTZ.RN.STRONG.GPU` |  | default | |
 | `RED.E.ADD.STRONG.GPU` |  | default | |
 | `RED.E.MAX.S32.STRONG.GPU` |  | shared atomics probes | Global reduction max (signed INT32, strong ordering) |
+| `RED.E.ADD.F32.FTZ.RN.STRONG.SYS` |  | system-scope probes | **System-scope float reduction** (cross-GPU/CPU visible FP32 atomicAdd) |
 | `RED.E.MIN.S32.STRONG.GPU` |  | shared atomics probes | Global reduction min (signed INT32, strong ordering) |
 | `REDUX` |  | shared atomics probes | Bare warp reduction (no type suffix, compiler-selected) |
 | `REDUX.MAX.S32` | ~60 cy | default | |
@@ -202,6 +206,7 @@ Latency notation:
 | `HMMA.1684.F32.TF32` | 66.66 cy/2xHMMA (TF32 via 2 instructions) | default | |
 | `HMNMX2` |  | default | |
 | `HSETP2.GTU.AND` |  | edge atomics probes | **Half2 packed comparison set-predicate** (greater-than-unordered, AND combiner). FP16 packed comparison -- first observation. |
+| `HSETP2.LE.AND` |  | -G debug + expanded probes | Half2 packed less-or-equal comparison. Second FP16 packed comparison variant. |
 | `HMUL2` | ~4.54 cy (only with -fmad=false) | -fmad=false | |
 
 ### FP32 Arithmetic (42 mnemonics)
@@ -354,6 +359,7 @@ Latency notation:
 |---|---|---|---|
 | `LDC` | 70.57 cy (constant cache chain) | default | |
 | `LDC.64` |  | default | |
+| `LDC.U16` |  | -G debug + expanded probes | Unsigned 16-bit constant memory load (sub-word constant cache) |
 | `ULDC` |  | default | |
 | `ULDC.64` |  | default | |
 
@@ -431,6 +437,7 @@ Latency notation:
 | `LDS.U8` |  | bitops tiling probes | Unsigned 8-bit shared memory load. |
 | `LDS.U16` |  | edge atomics probes | Unsigned 16-bit shared memory load. |
 | `STS` |  | default | |
+| `STS.64` |  | -O3 no-restrict | 64-bit shared memory store (without --restrict) |
 | `STS.U16` |  | default | |
 
 ### Other (6 mnemonics)
@@ -537,7 +544,7 @@ Latency notation:
 
 ---
 
-**Total: 391 unique SASS mnemonics across 25 categories.**
+**Total: 398 unique SASS mnemonics across 25 categories.**
 
 All latencies measured on RTX 4070 Ti (SM 8.9, 2625 MHz, 60 SMs).
 See `RESULTS.md` for measurement methodology, ncu cross-validation,
