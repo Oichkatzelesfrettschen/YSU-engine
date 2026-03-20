@@ -91,6 +91,31 @@ Findings:
   because INT16 requires widening to INT32 first (I2F.S16 instruction).
 - UINT8 pointer chase at 45 cy suggests L1 hit (below L2 at 92+ cy).
 
+### Tiling Probe ncu Analysis (RTX 4070 Ti, -O3 precision flags)
+
+| Kernel | SM Cycles | Instructions | Registers | Bank Conflicts | CPI |
+|---|---|---|---|---|---|
+| 5pt stencil 16x16 r=1 | 46,886 | 2,162,688 | 19 | 201,401 (9.3%) | 0.022 |
+| 9pt stencil 16x16 r=1 | 48,770 | 3,112,960 | 22 | 331,519 (10.6%) | 0.016 |
+| 25pt stencil 16x16 r=2 | 59,501 | 5,772,473 | 26 | 857,418 (14.9%) | 0.010 |
+| 3D 8x8x4 tile 7pt 64^3 | 14,471 | 1,172,736 | 24 | 60,640 (5.2%) | **0.012** |
+| RegTile 1x1 (baseline) | 32,101 | 491,520 | 16 | 0 | 0.065 |
+| RegTile 2x1 (float2) | 30,469 | 311,296 | 16 | 0 | 0.098 |
+| RegTile 4x1 (float4) | 28,772 | 188,416 | 20 | 0 | 0.153 |
+| RegTile 4x4 GEMM 256^3 | 169,903 | 1,159,296 | 39 | 0 | 0.147 |
+
+Key findings:
+- **float2 vectorized loads reduce instruction count 37%** (491K -> 311K) but
+  only reduce cycles 5% (32K -> 30K). Memory BW is the bottleneck, not insts.
+- **float4 reduces instructions 62%** but cycles only 10%. Diminishing returns
+  from vectorization beyond 64-bit loads on Ada.
+- **Bank conflict rate scales with stencil radius**: 5pt=9.3%, 9pt=10.6%,
+  25pt=14.9%. The 25pt stencil has 857K conflicts but wall-clock is only 2.7x
+  the 5pt -- confirms Ada's hardware coalescing absorbs most of the penalty.
+- **3D 8x8x4 tile has best CPI (0.012)**: the 64^3 working set fits in L2
+  (1.6 MB << 48 MB), so memory latency is low and the SM stays busy.
+- **Register tiles have zero bank conflicts** (no shared memory used).
+
 ### Conversion Latency (measured, RTX 4070 Ti)
 
 With 4 TC units per SM, theoretical peak: 15.5 independent HMMA/cy/SM.

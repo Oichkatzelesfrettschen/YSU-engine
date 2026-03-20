@@ -1,0 +1,9 @@
+kernel,sm_cycles_active,instructions_executed,registers,bank_conflicts,flags
+probe_tile_5pt_r1,46886.47,2162688,19,201401,O3_prec_nofmad_restrict
+probe_tile_9pt_r1,48769.85,3112960,22,331519,O3_prec_nofmad_restrict
+probe_tile_25pt_r2,59500.52,5772473,26,857418,O3_prec_nofmad_restrict
+probe_tile_3d_8x8x4,14470.72,1172736,24,60640,O3_prec_nofmad_restrict
+probe_regtile_1x1,32101.18,491520,16,0,O3_prec_nofmad_restrict
+probe_regtile_2x1,30468.77,311296,16,0,O3_prec_nofmad_restrict
+probe_regtile_4x1,28771.75,188416,20,0,O3_prec_nofmad_restrict
+probe_regtile_4x4,169902.85,1159296,39,0,O3_prec_nofmad_restrict
