@@ -302,7 +302,7 @@ Latency notation:
 | `LEA.HI.X` |  | default | |
 | `LEA.HI.X.SX32` |  | default | |
 
-### Integer Comparison (28 mnemonics)
+### Integer Comparison (29 mnemonics)
 
 | Mnemonic | Measured Latency | Flags | Notes |
 |---|---|---|---|
@@ -315,6 +315,7 @@ Latency notation:
 | `ISETP.GE.AND.EX` | ~~4.53 (similar) | default | |
 | `ISETP.GE.OR` |  | default | |
 | `ISETP.GE.U32.AND` |  | default | |
+| `ISETP.GE.U32.OR` |  | tiling probes (-O3 --restrict) | Unsigned GE with OR predicate combiner |
 | `ISETP.GE.U32.AND.EX` |  | default | |
 | `ISETP.GT.AND` | ~4.53 cy | default | |
 | `ISETP.GT.AND.EX` | ~~4.53 (similar) | default | |
@@ -490,6 +491,7 @@ Latency notation:
 | `UIADD3` |  | default | |
 | `UIADD3.X` |  | default | |
 | `UIMAD` |  | default | |
+| `UIMAD.WIDE` |  | tiling probes (-O3 --restrict) | **Uniform IMAD with 64-bit result** (for uniform 64-bit address computation) |
 | `UIMAD.WIDE.U32` |  | default | |
 | `UISETP.GE.U32.AND` |  | --maxrregcount | |
 | `UISETP.GT.AND` |  | --maxrregcount | |

@@ -7,3 +7,7 @@ probe_regtile_1x1,32101.18,491520,16,0,O3_prec_nofmad_restrict
 probe_regtile_2x1,30468.77,311296,16,0,O3_prec_nofmad_restrict
 probe_regtile_4x1,28771.75,188416,20,0,O3_prec_nofmad_restrict
 probe_regtile_4x4,169902.85,1159296,39,0,O3_prec_nofmad_restrict
+probe_tile_5pt_r1,40796.75,2162688,19,201483,O3_restrict_lineinfo
+probe_tile_3d_8x8x4,15762.35,1164800,24,60640,O3_restrict_lineinfo
+probe_regtile_1x1,30230.33,458752,16,0,O3_restrict_lineinfo
+probe_regtile_4x1,29722.77,155648,16,0,O3_restrict_lineinfo
