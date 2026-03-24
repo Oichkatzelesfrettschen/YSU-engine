@@ -15,6 +15,8 @@ Primary sources:
 - [KNOWLEDGE_SYNTHESIS.md](/home/eirikr/Github/YSU-engine/src/sass_re/KNOWLEDGE_SYNTHESIS.md)
 - [PAPER_CLAIMS_MATRIX.md](/home/eirikr/Github/YSU-engine/src/sass_re/PAPER_CLAIMS_MATRIX.md)
 - [PAPER_ASSETS_SM89.md](/home/eirikr/Github/YSU-engine/src/sass_re/PAPER_ASSETS_SM89.md)
+- [MONOGRAPH_BUILD.md](/home/eirikr/Github/YSU-engine/src/sass_re/MONOGRAPH_BUILD.md)
+- [MONOGRAPH_THEOREM_APPENDIX.md](/home/eirikr/Github/YSU-engine/src/sass_re/MONOGRAPH_THEOREM_APPENDIX.md)
 - [P2R_FRONTIER_ANALYSIS.md](/home/eirikr/Github/YSU-engine/src/sass_re/P2R_FRONTIER_ANALYSIS.md)
 - [UPLOP3_FRONTIER_ANALYSIS.md](/home/eirikr/Github/YSU-engine/src/sass_re/UPLOP3_FRONTIER_ANALYSIS.md)
 

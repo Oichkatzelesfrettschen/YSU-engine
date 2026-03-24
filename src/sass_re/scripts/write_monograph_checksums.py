@@ -11,6 +11,8 @@ PDF = ROOT / "tex/build/sm89_monograph.pdf"
 MANIFEST = PROCESSED / "SHA256SUMS"
 
 FILES = [
+    ROOT / "MONOGRAPH_BUILD.md",
+    ROOT / "MONOGRAPH_THEOREM_APPENDIX.md",
     PROCESSED / "README.md",
     PROCESSED / "inventory_numeric.csv",
     PROCESSED / "inventory_plot.csv",
@@ -25,6 +27,7 @@ FILES = [
     PROCESSED / "uplop3_pair_baseline_plot.csv",
     PROCESSED / "tool_effectiveness_numeric.csv",
     ROOT / "tex/sm89_monograph.tex",
+    ROOT / "tex/appendix_selection_laws.tex",
     ROOT / "tex/fig_inventory_closure.tex",
     ROOT / "tex/fig_p2r_frontier.tex",
     ROOT / "tex/fig_uplop3_runtime.tex",

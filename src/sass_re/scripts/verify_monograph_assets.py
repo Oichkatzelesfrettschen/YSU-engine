@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import pathlib
-import sys
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -14,8 +13,11 @@ REQUIRED_FILES = [
     MONOGRAPH_MD,
     MONOGRAPH_TEX,
     ROOT / "MONOGRAPH_GLOSSARY.md",
+    ROOT / "MONOGRAPH_BUILD.md",
+    ROOT / "MONOGRAPH_THEOREM_APPENDIX.md",
     ROOT / "EXPERIMENTS_PORTFOLIO_SHORTLIST.md",
     ROOT / "EXPERIMENTS_PAPER_PLAN.md",
+    ROOT / "tex/appendix_selection_laws.tex",
     ROOT / "tex/fig_inventory_closure.tex",
     ROOT / "tex/fig_p2r_frontier.tex",
     ROOT / "tex/fig_uplop3_runtime.tex",
@@ -66,6 +68,7 @@ def main() -> int:
             "\\input{fig_p2r_frontier.tex}",
             "\\input{fig_uplop3_runtime.tex}",
             "\\input{fig_pair_baseline.tex}",
+            "\\input{appendix_selection_laws.tex}",
         ]:
             if needle not in tex:
                 errors.append(f"tex missing token: {needle}")
