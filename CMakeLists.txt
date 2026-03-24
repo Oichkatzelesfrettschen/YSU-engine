@@ -242,6 +242,18 @@ else()
 endif()
 
 # ════════════════════════════════════════════════════════════════
+# CUDA LBM targets (only if CUDA Toolkit is found)
+# ════════════════════════════════════════════════════════════════
+find_package(CUDAToolkit QUIET)
+if(CUDAToolkit_FOUND)
+    enable_language(CUDA)
+    message(STATUS "CUDA found (${CUDAToolkit_VERSION}) — building CUDA LBM targets")
+    add_subdirectory(src/cuda_lbm)
+else()
+    message(STATUS "CUDA NOT found — skipping CUDA LBM targets")
+endif()
+
+# ════════════════════════════════════════════════════════════════
 # Standalone tools
 # ════════════════════════════════════════════════════════════════
 add_executable(inspect_ppm src/tools/inspect_ppm.c)
@@ -266,5 +278,6 @@ message(STATUS "  C compiler:   ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSIO
 message(STATUS "  AVX2:         ${HAS_AVX2}")
 message(STATUS "  OpenMP:       ${OpenMP_C_FOUND}")
 message(STATUS "  Vulkan:       ${Vulkan_FOUND}")
+message(STATUS "  CUDA:         ${CUDAToolkit_FOUND}")
 message(STATUS "  raylib:       ${RAYLIB_LIB}")
 message(STATUS "================================")

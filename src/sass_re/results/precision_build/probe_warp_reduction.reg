@@ -1,0 +1,41 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_ballot_popc_atomic' for 'sm_89'
+ptxas info    : Function properties for probe_ballot_popc_atomic
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.965 ms
+ptxas info    : Compiling entry function 'probe_shfl_idx' for 'sm_89'
+ptxas info    : Function properties for probe_shfl_idx
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.268 ms
+ptxas info    : Compiling entry function 'probe_match_all' for 'sm_89'
+ptxas info    : Function properties for probe_match_all
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 0.939 ms
+ptxas info    : Compiling entry function 'probe_vote_ballot' for 'sm_89'
+ptxas info    : Function properties for probe_vote_ballot
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 16 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 1.248 ms
+ptxas info    : Compiling entry function 'probe_redux_min_max' for 'sm_89'
+ptxas info    : Function properties for probe_redux_min_max
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.023 ms
+ptxas info    : Compiling entry function 'probe_redux_add' for 'sm_89'
+ptxas info    : Function properties for probe_redux_add
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.733 ms
+ptxas info    : Compiling entry function 'probe_warp_reduce_down' for 'sm_89'
+ptxas info    : Function properties for probe_warp_reduce_down
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.195 ms
+ptxas info    : Compiling entry function 'probe_warp_reduce_butterfly' for 'sm_89'
+ptxas info    : Function properties for probe_warp_reduce_butterfly
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.165 ms

@@ -1,0 +1,254 @@
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 39; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 50; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 51; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 56; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 57; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 62; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 63; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 63; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 64; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 64; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 65; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 66; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 67; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 68; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 69; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 70; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 71; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 72; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 78; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 85; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 96; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 97; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 98; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 99; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 100; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 101; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 102; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 103; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 104; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 105; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 106; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 107; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 110; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 111; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 118; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 119; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 120; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 134; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 172; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 182; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 183; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 184; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 189; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 190; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 191; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 192; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 193; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 195; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 196; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 197; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 198; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 199; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 200; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 201; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 202; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 203; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 204; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 205; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 206; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 207; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 208; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 209; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 210; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 211; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 212; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 213; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 214; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 215; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 216; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 237; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 238; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 239; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 254; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 258; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 270; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 308; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 318; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 319; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 332; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 371; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 372; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 373; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 373; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 374; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 375; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 376; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 377; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 378; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 379; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 380; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 381; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 382; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 383; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 384; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 385; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 386; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 387; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 388; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 389; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 390; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 391; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 392; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 393; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 394; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 395; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 396; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 397; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 398; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 399; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 400; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 401; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 402; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 403; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 409; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 410; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 411; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 412; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 413; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 414; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 415; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 416; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 417; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 418; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 422; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 423; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 430; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 444; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 481; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 491; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 492; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 504; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 541; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 551; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 552; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 564; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 656; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011367f_00000000-6_probe_fp64_transcendentals.ptx, line 834; warning : Program is doing double precision computations.
+ptxas <macro util>, line 12; warning : Program is doing double precision computations.
+ptxas <macro util>, line 14; warning : Program is doing double precision computations.
+ptxas <macro util>, line 15; warning : Program is doing double precision computations.
+ptxas <macro util>, line 16; warning : Program is doing double precision computations.
+ptxas <macro util>, line 22; warning : Program is doing double precision computations.
+ptxas <macro util>, line 34; warning : Program is doing double precision computations.
+ptxas <macro util>, line 38; warning : Program is doing double precision computations.
+ptxas <macro util>, line 42; warning : Program is doing double precision computations.
+ptxas <macro util>, line 43; warning : Program is doing double precision computations.
+ptxas <macro util>, line 44; warning : Program is doing double precision computations.
+ptxas <macro util>, line 45; warning : Program is doing double precision computations.
+ptxas <macro util>, line 48; warning : Program is doing double precision computations.
+ptxas <macro util>, line 61; warning : Program is doing double precision computations.
+ptxas <macro util>, line 62; warning : Program is doing double precision computations.
+ptxas <builtin>, line 1; warning : Program is doing double precision computations.
+ptxas <macro util>, line 66; warning : Program is doing double precision computations.
+ptxas <macro util>, line 67; warning : Program is doing double precision computations.
+ptxas <macro util>, line 68; warning : Program is doing double precision computations.
+ptxas <macro util>, line 69; warning : Program is doing double precision computations.
+ptxas <macro util>, line 70; warning : Program is doing double precision computations.
+ptxas <macro util>, line 71; warning : Program is doing double precision computations.
+ptxas <macro util>, line 72; warning : Program is doing double precision computations.
+ptxas <macro util>, line 73; warning : Program is doing double precision computations.
+ptxas <macro util>, line 74; warning : Program is doing double precision computations.
+ptxas <macro util>, line 75; warning : Program is doing double precision computations.
+ptxas <macro util>, line 80; warning : Program is doing double precision computations.
+ptxas <macro util>, line 81; warning : Program is doing double precision computations.
+ptxas <macro util>, line 82; warning : Program is doing double precision computations.
+ptxas <macro util>, line 9; warning : Program is doing double precision computations.
+ptxas <macro util>, line 12; warning : Program is doing double precision computations.
+ptxas <macro util>, line 14; warning : Program is doing double precision computations.
+ptxas <macro util>, line 15; warning : Program is doing double precision computations.
+ptxas <macro util>, line 24; warning : Program is doing double precision computations.
+ptxas <macro util>, line 26; warning : Program is doing double precision computations.
+ptxas <macro util>, line 29; warning : Program is doing double precision computations.
+ptxas <macro util>, line 30; warning : Program is doing double precision computations.
+ptxas <builtin>, line 1; warning : Program is doing double precision computations.
+ptxas <macro util>, line 31; warning : Program is doing double precision computations.
+ptxas <macro util>, line 32; warning : Program is doing double precision computations.
+ptxas <macro util>, line 33; warning : Program is doing double precision computations.
+ptxas <macro util>, line 34; warning : Program is doing double precision computations.
+ptxas <macro util>, line 35; warning : Program is doing double precision computations.
+ptxas <macro util>, line 36; warning : Program is doing double precision computations.
+ptxas <macro util>, line 37; warning : Program is doing double precision computations.
+ptxas <macro util>, line 38; warning : Program is doing double precision computations.
+ptxas <macro util>, line 39; warning : Program is doing double precision computations.
+ptxas <macro util>, line 40; warning : Program is doing double precision computations.
+ptxas <macro util>, line 43; warning : Program is doing double precision computations.
+ptxas <macro util>, line 50; warning : Program is doing double precision computations.
+ptxas info    : 272 bytes gmem, 16 bytes cmem[4]
+ptxas info    : Compiling entry function 'probe_fp32_sin_fast_chain' for 'sm_89'
+ptxas info    : Function properties for probe_fp32_sin_fast_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.749 ms
+ptxas info    : Compiling entry function 'probe_fp64_rsqrt_chain' for 'sm_89'
+ptxas info    : Function properties for probe_fp64_rsqrt_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 17 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 2.699 ms
+ptxas info    : Compiling entry function 'probe_fp64_sqrt_chain' for 'sm_89'
+ptxas info    : Function properties for probe_fp64_sqrt_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 23 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 3.154 ms
+ptxas info    : Compiling entry function 'probe_fp64_log_chain' for 'sm_89'
+ptxas info    : Function properties for probe_fp64_log_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers, 368 bytes cmem[0], 80 bytes cmem[2]
+ptxas info    : Compile time = 2.501 ms
+ptxas info    : Compiling entry function 'probe_fp64_exp_chain' for 'sm_89'
+ptxas info    : Function properties for probe_fp64_exp_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 19 registers, used 0 barriers, 368 bytes cmem[0], 96 bytes cmem[2]
+ptxas info    : Compile time = 1.960 ms
+ptxas info    : Compiling entry function 'probe_fp64_sin_chain' for 'sm_89'
+ptxas info    : Function properties for probe_fp64_sin_chain
+    40 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 40 bytes cumulative stack size, 368 bytes cmem[0], 32 bytes cmem[2]
+ptxas info    : Compile time = 7.264 ms
+ptxas info    : Function properties for __internal_trig_reduction_slowpathd
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads

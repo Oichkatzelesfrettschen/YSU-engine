@@ -78,6 +78,11 @@
       cursor: pointer;
     }
     .sphere-item.active { background: #1d4ed8; }
+    .stack-gap { margin-top: 6px; }
+    .note-block {
+      display: block;
+      margin-top: 6px;
+    }
 
     #exportText {
       width: 100%;
@@ -105,30 +110,30 @@
     <div class="panel">
       <h2>Objects</h2>
       <button id="addSphereBtn">+ Add Sphere</button>
-      <button id="removeSphereBtn" class="danger" style="margin-top:6px;">– Remove Selected</button>
+      <button id="removeSphereBtn" class="danger stack-gap">– Remove Selected</button>
       <div id="sphere-list"></div>
     </div>
 
     <div class="panel">
       <h2>Selected Sphere</h2>
       <small>Seçmek için listeden tıkla.</small>
-      <div style="margin-top:6px;">
+      <div class="stack-gap">
         <label>Position (X, Y, Z)</label>
         <input type="number" step="0.1" id="posX" />
         <input type="number" step="0.1" id="posY" />
         <input type="number" step="0.1" id="posZ" />
       </div>
-      <div style="margin-top:6px;">
+      <div class="stack-gap">
         <label>Radius</label>
         <input type="number" step="0.05" id="radius" />
       </div>
-      <div style="margin-top:6px;">
+      <div class="stack-gap">
         <label>Color (R, G, B · 0–1)</label>
         <input type="number" step="0.05" id="colR" />
         <input type="number" step="0.05" id="colG" />
         <input type="number" step="0.05" id="colB" />
       </div>
-      <small style="display:block;margin-top:6px;">
+      <small class="note-block">
         Not: Değerleri değiştirdiğinde sahne hemen güncellenir.
       </small>
     </div>

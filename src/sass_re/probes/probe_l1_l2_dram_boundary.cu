@@ -26,7 +26,7 @@
 
 #define CHASE_LEN 8192
 
-__global__ void __launch_bounds__(1)
+extern "C" __global__ void __launch_bounds__(1)
 k_chase_single(const int *arr, volatile long long *out, int n) {
     int idx = 0;
     // Warmup
@@ -60,6 +60,7 @@ static void build_random_cycle(int *perm, int n, unsigned seed) {
     free(cycle);
 }
 
+#ifndef SASS_RE_EMBEDDED_RUNNER
 int main() {
     cudaDeviceProp prop;
     CHECK(cudaGetDeviceProperties(&prop, 0));
@@ -127,3 +128,4 @@ int main() {
     cudaFree(d_out);
     return 0;
 }
+#endif

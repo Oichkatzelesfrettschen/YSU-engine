@@ -1,0 +1,36 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_u8_vs_s8_to_float' for 'sm_89'
+ptxas info    : Function properties for probe_u8_vs_s8_to_float
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 16 registers, used 0 barriers, 388 bytes cmem[0]
+ptxas info    : Compile time = 1.583 ms
+ptxas info    : Compiling entry function 'probe_uint16x4_load' for 'sm_89'
+ptxas info    : Function properties for probe_uint16x4_load
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.904 ms
+ptxas info    : Compiling entry function 'probe_uint8x4_load' for 'sm_89'
+ptxas info    : Function properties for probe_uint8x4_load
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.851 ms
+ptxas info    : Compiling entry function 'probe_int16_load_store' for 'sm_89'
+ptxas info    : Function properties for probe_int16_load_store
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.626 ms
+ptxas info    : Compiling entry function 'probe_uint16_load_store' for 'sm_89'
+ptxas info    : Function properties for probe_uint16_load_store
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.606 ms
+ptxas info    : Compiling entry function 'probe_int8_load_store' for 'sm_89'
+ptxas info    : Function properties for probe_int8_load_store
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.686 ms
+ptxas info    : Compiling entry function 'probe_uint8_load_store' for 'sm_89'
+ptxas info    : Function properties for probe_uint8_load_store
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.662 ms

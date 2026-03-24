@@ -1,0 +1,102 @@
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 39; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 41; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 43; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 45; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 47; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 49; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 50; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 52; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 83; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 85; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 87; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 88; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 90; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 91; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 92; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 94; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 95; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 96; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 98; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 99; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 100; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 102; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 103; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 104; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 106; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 107; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 108; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 110; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 111; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 112; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 115; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 191; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 193; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_00113663_00000000-6_probe_fp64_extended.ptx, line 196; warning : Program is doing double precision computations.
+ptxas <macro util>, line 10; warning : Program is doing double precision computations.
+ptxas <macro util>, line 11; warning : Program is doing double precision computations.
+ptxas <macro util>, line 31; warning : Program is doing double precision computations.
+ptxas <macro util>, line 39; warning : Program is doing double precision computations.
+ptxas <builtin>, line 3; warning : Program is doing double precision computations.
+ptxas <macro util>, line 40; warning : Program is doing double precision computations.
+ptxas <macro util>, line 69; warning : Program is doing double precision computations.
+ptxas <macro util>, line 70; warning : Program is doing double precision computations.
+ptxas <macro util>, line 71; warning : Program is doing double precision computations.
+ptxas <macro util>, line 85; warning : Program is doing double precision computations.
+ptxas <macro util>, line 86; warning : Program is doing double precision computations.
+ptxas <macro util>, line 87; warning : Program is doing double precision computations.
+ptxas <macro util>, line 88; warning : Program is doing double precision computations.
+ptxas <macro util>, line 89; warning : Program is doing double precision computations.
+ptxas <macro util>, line 90; warning : Program is doing double precision computations.
+ptxas <macro util>, line 91; warning : Program is doing double precision computations.
+ptxas <macro util>, line 92; warning : Program is doing double precision computations.
+ptxas <macro util>, line 93; warning : Program is doing double precision computations.
+ptxas <macro util>, line 103; warning : Program is doing double precision computations.
+ptxas <macro util>, line 106; warning : Program is doing double precision computations.
+ptxas <macro util>, line 110; warning : Program is doing double precision computations.
+ptxas <macro util>, line 138; warning : Program is doing double precision computations.
+ptxas <macro util>, line 148; warning : Program is doing double precision computations.
+ptxas <macro util>, line 161; warning : Program is doing double precision computations.
+ptxas <macro util>, line 179; warning : Program is doing double precision computations.
+ptxas <macro util>, line 180; warning : Program is doing double precision computations.
+ptxas <macro util>, line 194; warning : Program is doing double precision computations.
+ptxas <macro util>, line 212; warning : Program is doing double precision computations.
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_fp64_divide' for 'sm_89'
+ptxas info    : Function properties for probe_fp64_divide
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 4.545 ms
+ptxas info    : Compiling entry function 'probe_fchk_divide' for 'sm_89'
+ptxas info    : Function properties for probe_fchk_divide
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 16 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 3.836 ms
+ptxas info    : Compiling entry function 'probe_dsetp' for 'sm_89'
+ptxas info    : Function properties for probe_dsetp
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.066 ms
+ptxas info    : Compiling entry function 'probe_dmnmx' for 'sm_89'
+ptxas info    : Function properties for probe_dmnmx
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 16 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 0.742 ms

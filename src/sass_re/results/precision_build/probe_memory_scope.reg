@@ -1,0 +1,21 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_prefetch_strided' for 'sm_89'
+ptxas info    : Function properties for probe_prefetch_strided
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 34 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 3.124 ms
+ptxas info    : Compiling entry function 'probe_prefetch' for 'sm_89'
+ptxas info    : Function properties for probe_prefetch
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.992 ms
+ptxas info    : Compiling entry function 'probe_fence_scopes' for 'sm_89'
+ptxas info    : Function properties for probe_fence_scopes
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.736 ms
+ptxas info    : Compiling entry function 'probe_sys_scope' for 'sm_89'
+ptxas info    : Function properties for probe_sys_scope
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.590 ms

@@ -1,0 +1,31 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_fp32_normal_cost' for 'sm_89'
+ptxas info    : Function properties for probe_fp32_normal_cost
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 364 bytes cmem[0]
+ptxas info    : Compile time = 1.504 ms
+ptxas info    : Compiling entry function 'probe_fp32_denormal_cost' for 'sm_89'
+ptxas info    : Function properties for probe_fp32_denormal_cost
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 364 bytes cmem[0]
+ptxas info    : Compile time = 0.832 ms
+ptxas info    : Compiling entry function 'probe_fp32_ftz_chain' for 'sm_89'
+ptxas info    : Function properties for probe_fp32_ftz_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 6.958 ms
+ptxas info    : Compiling entry function 'probe_fp32_saturate' for 'sm_89'
+ptxas info    : Function properties for probe_fp32_saturate
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.590 ms
+ptxas info    : Compiling entry function 'probe_fp32_ftz' for 'sm_89'
+ptxas info    : Function properties for probe_fp32_ftz
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.562 ms
+ptxas info    : Compiling entry function 'probe_fp32_ieee' for 'sm_89'
+ptxas info    : Function properties for probe_fp32_ieee
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.444 ms

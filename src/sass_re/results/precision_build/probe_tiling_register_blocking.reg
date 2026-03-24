@@ -1,0 +1,36 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_regtile_warp_reduce' for 'sm_89'
+ptxas info    : Function properties for probe_regtile_warp_reduce
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 11 registers, used 1 barriers, 32 bytes smem, 372 bytes cmem[0]
+ptxas info    : Compile time = 3.122 ms
+ptxas info    : Compiling entry function 'probe_regtile_lbm_2cell' for 'sm_89'
+ptxas info    : Function properties for probe_regtile_lbm_2cell
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 12.562 ms
+ptxas info    : Compiling entry function 'probe_regtile_4x4' for 'sm_89'
+ptxas info    : Function properties for probe_regtile_4x4
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 0 barriers, 388 bytes cmem[0]
+ptxas info    : Compile time = 5.905 ms
+ptxas info    : Compiling entry function 'probe_regtile_2x2' for 'sm_89'
+ptxas info    : Function properties for probe_regtile_2x2
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 388 bytes cmem[0]
+ptxas info    : Compile time = 3.547 ms
+ptxas info    : Compiling entry function 'probe_regtile_4x1' for 'sm_89'
+ptxas info    : Function properties for probe_regtile_4x1
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.854 ms
+ptxas info    : Compiling entry function 'probe_regtile_2x1' for 'sm_89'
+ptxas info    : Function properties for probe_regtile_2x1
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.709 ms
+ptxas info    : Compiling entry function 'probe_regtile_1x1' for 'sm_89'
+ptxas info    : Function properties for probe_regtile_1x1
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.624 ms

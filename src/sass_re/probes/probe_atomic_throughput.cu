@@ -35,7 +35,7 @@
 #define ITERS 4096
 
 /* Uncontended: each thread writes to its own address */
-__global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(128)
 k_atomic_uncontended(int *counters, int n) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     for (int j = 0; j < ITERS; j++)
@@ -43,7 +43,7 @@ k_atomic_uncontended(int *counters, int n) {
 }
 
 /* Warp-contended: all 32 threads in a warp -> 1 address */
-__global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(128)
 k_atomic_warp_contended(int *counters, int n) {
     int warp_id = (threadIdx.x + blockIdx.x * blockDim.x) / 32;
     for (int j = 0; j < ITERS; j++)
@@ -51,7 +51,7 @@ k_atomic_warp_contended(int *counters, int n) {
 }
 
 /* Block-contended: all 128 threads in a block -> 1 address */
-__global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(128)
 k_atomic_block_contended(int *counters, int n) {
     int block_id = blockIdx.x;
     for (int j = 0; j < ITERS; j++)
@@ -59,28 +59,28 @@ k_atomic_block_contended(int *counters, int n) {
 }
 
 /* Global-contended: ALL threads -> 1 address (worst case) */
-__global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(128)
 k_atomic_global_contended(int *counters, int n) {
     for (int j = 0; j < ITERS; j++)
         atomicAdd(&counters[0], 1);
 }
 
 /* Float atomicAdd: same contention levels */
-__global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(128)
 k_atomic_float_uncontended(float *counters, int n) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     for (int j = 0; j < ITERS; j++)
         atomicAdd(&counters[i], 1.0f);
 }
 
-__global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(128)
 k_atomic_float_global(float *counters, int n) {
     for (int j = 0; j < ITERS; j++)
         atomicAdd(&counters[0], 1.0f);
 }
 
 /* Shared memory atomic: warp-contended */
-__global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(128)
 k_atomic_shared_warp(int *out) {
     __shared__ int smem[4];  // 4 warps in a block
     int warp = threadIdx.x / 32;
@@ -95,7 +95,7 @@ k_atomic_shared_warp(int *out) {
 }
 
 /* Shared memory atomic: all-contended (1 address) */
-__global__ void __launch_bounds__(128)
+extern "C" __global__ void __launch_bounds__(128)
 k_atomic_shared_all(int *out) {
     __shared__ int smem;
     if (threadIdx.x == 0) smem = 0;
@@ -108,6 +108,7 @@ k_atomic_shared_all(int *out) {
     if (threadIdx.x == 0) out[blockIdx.x] = smem;
 }
 
+#ifndef SASS_RE_EMBEDDED_RUNNER
 int main() {
     cudaDeviceProp prop;
     CHECK(cudaGetDeviceProperties(&prop, 0));
@@ -184,3 +185,4 @@ int main() {
     cudaFree(d_int); cudaFree(d_float); cudaFree(d_shared_out);
     return 0;
 }
+#endif

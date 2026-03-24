@@ -1,0 +1,79 @@
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 175; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 176; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 184; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 185; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 187; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 189; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 190; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 191; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 192; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 194; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 195; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 198; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 200; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 202; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 203; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 204; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 205; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 217; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 220; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 335; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 336; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 337; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 338; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 341; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 342; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 343; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 344; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 347; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 349; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 351; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 352; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 353; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 354; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 356; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 359; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 361; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 363; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 364; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 365; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 366; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 368; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 371; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 373; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 375; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 376; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 377; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 378; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 380; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 381; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 384; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 385; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 386; warning : Program is doing double precision computations.
+ptxas /tmp/tmpxft_0011383f_00000000-6_probe_nonexistent_formats_emulation.ptx, line 387; warning : Program is doing double precision computations.
+ptxas info    : 0 bytes gmem, 32 bytes cmem[3]
+ptxas info    : Compiling entry function 'probe_fp256_qd_add' for 'sm_89'
+ptxas info    : Function properties for probe_fp256_qd_add
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.791 ms
+ptxas info    : Compiling entry function 'probe_uint256_add_chain' for 'sm_89'
+ptxas info    : Function properties for probe_uint256_add_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.928 ms
+ptxas info    : Compiling entry function 'probe_fp128_dd_add_chain' for 'sm_89'
+ptxas info    : Function properties for probe_fp128_dd_add_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 16 registers, used 0 barriers, 384 bytes cmem[0], 16 bytes cmem[2]
+ptxas info    : Compile time = 1.318 ms
+ptxas info    : Compiling entry function 'probe_bf8_as_fp8e5m2' for 'sm_89'
+ptxas info    : Function properties for probe_bf8_as_fp8e5m2
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.717 ms
+ptxas info    : Compiling entry function 'probe_bf4_hypothetical' for 'sm_89'
+ptxas info    : Function properties for probe_bf4_hypothetical
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.804 ms

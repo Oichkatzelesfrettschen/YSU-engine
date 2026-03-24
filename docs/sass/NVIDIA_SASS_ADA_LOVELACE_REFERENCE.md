@@ -6,6 +6,121 @@ This document is a technical reference for NVIDIA Shader Assembly (SASS) on the 
 
 Where exact internal details are not publicly confirmed, inferences are marked as such and are based on observable behavior, patent filings, and continuity with prior architectures (Turing SM 7.5, Ampere SM 8.0/8.6).
 
+Recent inventory note:
+- The latest manifest-backed aggregate refresh is
+  `src/sass_re/results/runs/full_recursive_20260320_182500`.
+- The latest full-corpus flag sweep is
+  `src/sass_re/results/runs/flag_sweep_postfix_parallel6x4_20260320_233059`.
+- That run completed `343 / 343` compile-enabled disassemblies with no
+  failures, held a canonical optimized frontier of `379` raw mnemonics across
+  the five optimized comparison lanes, and reached `382` in the strongest
+  discovery lane (`--maxrregcount=32`).
+- The full-corpus `6 x 4` flag sweep kept that optimized frontier stable,
+  confirmed `--restrict` at `381`, and validated `-Xptxas -dlcm=cg` as a real
+  load-family spelling lever on local `sm_89`.
+- The same run completed `ncu` profiling with `331` profiled probes,
+  `3` failures, and `14` skips, which now bounds the remaining operational
+  runner/launch tail separately from the mnemonic-inventory frontier.
+- Newly folded-in spellings from the final aggregate refresh include
+  `UISETP.EQ.U32.XOR`, `UISETP.GE.U32.AND`, `UISETP.GT.AND`, `I2F.S8`,
+  `LDG.E.U16.CONSTANT`, `LDG.E.U8.CONSTANT`, and `LDL.LU`.
+- The full-corpus `-Xptxas -dlcm=cg` lane adds the now-confirmed load-family
+  spellings `LD.E.64.STRONG.GPU`, `LDG.E.128.STRONG.GPU`,
+  `LDG.E.64.STRONG.GPU`, `LDG.E.S16.STRONG.GPU`,
+  `LDG.E.S8.STRONG.GPU`, `LDG.E.U16.STRONG.GPU`, and
+  `LDG.E.U8.STRONG.GPU`.
+- `-G -dopt=on`, `--extra-device-vectorization`,
+  `--extra-device-vectorization --restrict`, and
+  `-Xptxas -disable-optimizer-consts` do not move the full-corpus frontier on
+  this local Ada toolchain; `--use_fast_math` remains an FTZ-family and
+  `MUFU.SQRT` lever rather than a structural mnemonic-family expansion.
+- The checked-in Ada probe corpus now also includes dedicated OptiX callable
+  and cuDNN host-managed tranches.
+- The OptiX callable runner validates a direct-callable plus
+  continuation-callable path around `optixTrace()` and returns the expected
+  payload `0x00000117`.
+- A separate cuDNN library-mining pass was run against packaged `sm_86` cubins
+  shipped with the local cuDNN 9.20 installation. That pass remains useful
+  for mnemonic hunting near Ada, but only the still-unconfirmed remainder is
+  tracked as provisional library-mined evidence rather than canonical direct
+  `sm_89` probe hits.
+- A dedicated multi-translation-unit `-dlto` tranche now also confirms that
+  device link-time optimization is a real code-shape lever on local `sm_89`.
+  In the with-LTO build, helper functions are fused into the main kernel,
+  `CALL.ABS.NOINC` and `RET.ABS.NODEC` disappear from the kernel body, and
+  `IMAD.X` appears in the fused kernel's mnemonic set.
+- A follow-up direct `sm_89` confirmation tranche has now promoted
+  `HFMA2.RELU`, `HMMA.1688.F32.TF32`, `LDSM.16.MT88.4`,
+  `LDGSTS.E.LTC128B.128`, `LDGSTS.E.LTC128B.128.ZFILL`,
+  `LDGSTS.E.BYPASS.LTC128B.128`, `LDGSTS.E.BYPASS.LTC128B.128.ZFILL`, and
+  `HMNMX2.NAN`, `F2FP.BF16.F32.PACK_AB`, `ULDC.U8`, `ULDC.S8`, and
+  `F2FP.RELU.BF16.F32.PACK_AB` into the checked-in Ada inventory.
+- Follow-up direct probes targeting the remaining cuDNN-mined predicate/uniform
+  outliers now reproduce the broader same-carrier full-mask shape
+  `P2R Rn, PR, Rn, 0x7f`, but still do not reproduce the byte-qualified
+  `P2R.B1`, `P2R.B2`, or `P2R.B3` forms on the local direct `sm_89` path.
+  Those still remain library-mined observations for now.
+- A uniform-path follow-up also shows that the local compiler still lowers the
+  corresponding address and shift shapes to `LEA.HI.X.SX32` and
+  `SHF.L.U64.HI`, not the fully uniform `ULEA.HI.X.SX32` and
+  `USHF.L.U64.HI` variants seen in cuDNN-mined cubins. Additional tighter
+  follow-ups around warp-uniform broadcast loads and mixed signed-offset
+  coalescing patterns still do not reproduce those fully uniform spellings on
+  the local direct `sm_89` path.
+- A dedicated alias-pack follow-up now also shows that the nearest local
+  cuDNN-like scalar-pack source shape, zero high lane plus immediate
+  `STG.E.U16`, still renders as `F2FP.F16.F32.PACK_AB` or
+  `F2FP.BF16.F32.PACK_AB` in both `cuobjdump` and `nvdisasm`. That makes the
+  shorter library-mined spellings `F2FP.PACK_AB` and `F2FP.BF16.PACK_AB`
+  look more like library/disassembler aliases adjacent to the confirmed local
+  typed forms than straightforward missing direct `sm_89` source shapes.
+- A stricter uniform follow-up under `p2r_uniform_strict_20260320` now closes
+  half of that uniform gap: `ULEA.HI.X.SX32` is directly confirmed on local
+  `sm_89`, while `USHF.L.U64.HI` still does not reproduce locally. The tighter
+  shift shapes reach `USHF.L.U32` plus GPR-space `SHF.L.U64.HI`, but not the
+  fully uniform 64-bit-high shift variant seen in cuDNN-mined cubins.
+- A newer follow-up under `uplop3_p2r_followup_20260320` now sharpens the last
+  two cuDNN-mined predicate/uniform gaps. The stricter vector-pack source shape
+  still lowers to `ISETP`/`SEL`/`PRMT`/`LOP3` glue rather than `P2R.B1/B2/B3`,
+  while the async+tensor hybrid reproduces a much closer cuDNN-like
+  neighborhood with `LDGSTS.E.BYPASS.LTC128B.128`, `HMMA.1688.F32.TF32`,
+  `@!UPT UIADD3`, and dense `PLOP3.LUT` using `0x40` and `0x80`, but still
+  does not emit raw `UPLOP3.LUT` locally.
+- A stricter follow-up under `p2r_uplop3_stage_followup_20260320` pushes both
+  motifs harder again. The banked-reload probe mirrors a longer-lived packed
+  predicate-mask lifecycle but still lowers to
+  `ISETP`/`SEL`/`LOP3`/`PRMT`/`IMAD` glue rather than `P2R.B1/B2/B3`.
+  The stage-toggle tensor probe reproduces
+  `HMMA.1688.F32.TF32`, `LDGSTS.E.BYPASS.LTC128B.128`,
+  `LDGSTS.E.BYPASS.LTC128B.128.ZFILL`, dense `PLOP3.LUT`, and repeated
+  `@!UPT UIADD3` / `R2UR` scaffolding, but still does not emit raw
+  `UPLOP3.LUT` locally.
+- A final uniform-u64 follow-up under `ushf_u64_hi_final_20260320` then tests
+  cleaner constant-backed and parameter-backed 64-bit shift families. It
+  directly confirms `ULEA` and `ULEA.HI.X` in the local uniform address path,
+  but still does not reproduce `USHF.L.U64.HI`; the compiler continues to pick
+  GPR-space `SHF.L.U64.HI` or `SHF.R.U64` for the actual 64-bit-high shift.
+- A direct prefix cleanup tranche under `prefix_direct_followup_20260320` now
+  directly confirms `LDC.U8` and `LDC.S8`. The same tranche also tests a wider
+  `UISETP` sweep, but those source shapes still lower to ordinary `ISETP` plus
+  `SEL` rather than surfacing the broader library-mined `UISETP.*` family.
+- A final CUTLASS-like tensor follow-up under
+  `cutlass_predicate_pipeline_20260320` produces the strongest direct local
+  optimized neighborhood around the unresolved predicate cluster by combining
+  base `P2R`, `PLOP3.LUT`, `HMMA.1688.F32.TF32`,
+  `LDGSTS.E.BYPASS.LTC128B.128*`, and `@!UPT UIADD3`, but still does not emit
+  `P2R.B1/B2/B3` or `UPLOP3.LUT`.
+- A newer exact predicate/uniform follow-up under
+  `predicate_uniform_frontier_20260321_031500` reconciles an important
+  local erratum: base `R2P` is already directly observed in the local
+  transcendental compile-profile path. A newer exact follow-up under
+  `predicate_uniform_frontier_20260321_024500` now directly confirms
+  `USHF.L.U64.HI`, so the remaining direct-local gap is now narrower:
+  `P2R.B1/B2/B3` and `UPLOP3.LUT`. The same exact
+  tranche re-confirms stronger nearby local forms including `ULOP3.LUT`,
+  `USEL`, `UISETP.NE.U32.AND`, `ULDC.64`, `HMMA.1688.F32.TF32`, and
+  `LDGSTS.E.BYPASS.LTC128B.128(.ZFILL)`.
+
 ---
 
 ## Table of Contents
@@ -765,6 +880,24 @@ STG.E.32 [R2.64 + 0x100], R5 ;         // store with offset
 LDGSTS.E.128 [R0], [R2.64] ;   // R0 = shared mem addr, R2:R3 = global addr
 ```
 
+Observed Ada spellings from the explicit `cp.async` lowering probe:
+
+- `cp.async.ca.shared.global ..., 4, 2` -> `LDGSTS.E.ZFILL`
+- `cp.async.ca.shared.global ..., 8, 4` -> `LDGSTS.E.64.ZFILL`
+- `cp.async.cg.shared.global ..., 16, 8` -> `LDGSTS.E.BYPASS.128.ZFILL`
+- `cp.async ... , 16, ignore-src` -> predicated `LDGSTS.E.BYPASS.128` without `ZFILL`
+
+Observed Ada spellings from the direct `L2::128B` prefetch-hint tranche:
+
+- `cp.async.ca.shared.global.L2::128B ..., 16` -> `LDGSTS.E.LTC128B.128`
+- `cp.async.ca.shared.global.L2::128B ..., 16, 8` -> `LDGSTS.E.LTC128B.128.ZFILL`
+- `cp.async.cg.shared.global.L2::128B ..., 16` -> `LDGSTS.E.BYPASS.LTC128B.128`
+- `cp.async.cg.shared.global.L2::128B ..., 16, 8` -> `LDGSTS.E.BYPASS.LTC128B.128.ZFILL`
+
+Toolchain note:
+- On this CUDA 13.1 setup, `.cg` is the 16-byte path.
+- The 4-byte and 8-byte zero-fill confirmations use `.ca`.
+
 ### 4.2 Shared Memory
 
 #### LDS — Load Shared
@@ -840,6 +973,68 @@ TEX.1D.R32F R5, R1, t0, s0 ;   // pseudo-syntax; actual SASS is opaque descripto
 
 Texture operations are outside the scope of general compute SASS but are used by the graphics pipeline and `tex1D`/`tex2D` CUDA intrinsics.
 
+Practical compute-side guardrails from the SM89 probe suite:
+
+- Hardware filtering and wrap/mirror address modes should be tested with CUDA arrays, not `cudaResourceTypeLinear`. Linear resources ignore `filterMode`.
+- `wrap` and `mirror` are only valid with normalized coordinates.
+- The TMU interpolation weights are quantized fixed-point weights, so CPU oracles should compare with an epsilon instead of exact equality.
+- The strongest proof of TMU interpolation offload is disassembly: the hardware-filtered kernels emit `TEX`/`TLD`, while the manual bilinear/trilinear kernels show dense `FFMA` interpolation clusters.
+
+Observed texture/surface SASS from the dedicated TMU behavior probe:
+
+- `TEX.SCR.LL` for filtered 2D/3D fetches
+- `TLD.SCR.LZ` for direct texture loads
+- `SULD.D.BA.1D.STRONG.SM`, `SULD.D.BA.2D.STRONG.SM`
+- `SUST.D.BA.1D.STRONG.SM.TRAP`, `SUST.D.BA.2D.STRONG.SM.TRAP`
+
+Observed runtime behavior from the dedicated host runner:
+
+- Point vs linear filtering matches the CPU oracle within epsilon for 1D/2D/3D tests
+- Clamp, border, wrap, and mirror address modes all match the normalized-coordinate oracle
+- Surface zero-boundary and clamp-boundary reads both match the expected values
+
+### 4.5.1 Recent Ada Lowering Confirmations
+
+These are practical CUDA-to-SASS mappings confirmed by the current recursive probe suite:
+
+- `dp4a.u32.u32` -> `IDP.4A.U8.U8`
+- `dp4a.s32.s32` -> `IDP.4A.S8.S8`
+- `dp4a.s32.u32` -> `IDP.4A.S8.U8`
+- `dp4a.u32.s32` -> `IDP.4A.U8.S8`
+- `__reduce_and_sync()` / `redux.sync.and.b32` -> bare `REDUX`
+- `__reduce_or_sync()` -> `REDUX.OR`
+- `redux.sync.xor` -> `REDUX.XOR`
+- `__syncthreads_and()` -> `BAR.RED.AND.DEFER_BLOCKING`
+- `__syncthreads_or()` -> `BAR.RED.OR.DEFER_BLOCKING`
+- `__syncthreads_count()` -> `BAR.RED.POPC.DEFER_BLOCKING` plus `B2R.RESULT`
+- `cuda_awbarrier_primitives.h` init/arrive/wait flows ->
+  `BAR.SYNC.DEFER_BLOCKING` + `MEMBAR.ALL.CTA` + `ATOMS.ARRIVE.64`
+- `cuda_awbarrier_primitives.h` arrive-and-drop ->
+  `ATOMS.POPC.INC.32` + `ATOMS.ARRIVE.64`
+
+Current caveat from the dedicated `mbarrier` tranche:
+- `__mbarrier_try_wait()` compiles on this Ada/CUDA 13.1 setup, but the emitted
+  path behaves like a trap-style negative control during live launch. Treat it
+  as a disassembly finding, not a currently validated runtime primitive.
+
+### 4.5.2 Outboard Accelerator Probe Status
+
+These probes exercise fixed-function engines or host-managed accelerator APIs
+that sit outside the ordinary SM instruction stream:
+
+- OptiX real pipeline:
+  the dedicated runner builds a real triangle GAS, SBT, and `optixTrace()`
+  pipeline and returns the expected payload `0x00000100`.
+- Optical Flow Accelerator:
+  the dedicated runner confirms API availability, supported output grids
+  `1,2,4`, and a synthetic horizontal flow result of about `+3.906` pixels.
+- NVDEC / NVENC:
+  the dedicated runner confirms NVDEC H.264 capability, NVENC session open,
+  preset enumeration, and input-format enumeration. The current minimal H.264
+  encode-session recipe still returns `NV_ENC_ERR_UNSUPPORTED_PARAM` or
+  `NV_ENC_ERR_INVALID_PARAM` on this local driver, so the probe records
+  `nvenc_session_initialized=0` instead of failing hard.
+
 ### 4.6 Atomic Operations
 
 #### ATOMS — Shared Memory Atomic
@@ -884,6 +1079,15 @@ MEMBAR.CTA ;                    // memory fence: all prior memory operations fro
 MEMBAR.GPU ;                    // fence visible to all threads on the GPU
 MEMBAR.SYS ;                    // fence visible system-wide (including CPU / other GPUs)
 ```
+
+Observed Ada corpus note:
+- The optimized fence probes emit the architectural spellings `MEMBAR.SC.GPU`
+  and `MEMBAR.SC.SYS` as expected.
+- A dedicated debug-lane follow-up bundle
+  (`debug_followups_20260320_090904`) also reproduces `MEMBAR.SC.VC`, but only
+  in `-O0 -G` disassembly alongside `R2UR` and `ERRBAR`. On this CUDA 13.1
+  setup it behaves like a debug/instrumentation fence spelling rather than the
+  normal optimized lowering for `__threadfence()` or `__threadfence_system()`.
 
 #### DEPBAR — Dependency Barrier
 
@@ -1330,7 +1534,70 @@ Benefits:
 
 The compiler identifies warp-uniform values (kernel parameters, blockIdx-derived constants, loop bounds) and routes them to the uniform datapath automatically.
 
+Observed Ada corpus note:
+- `S2UR`, `ULDC`, `UIADD3`, `UIMAD`, `ULOP3`, `UPRMT`, and related uniform
+  datapath instructions appear in optimized kernels.
+- `R2UR` is now reproduced by a dedicated follow-up probe, but only in the
+  `-O0 -G` lane. The paired `-O3 -Xptxas -O3` build of the same kernels does
+  not retain that register-to-uniform transfer path, which strongly suggests a
+  debug-lane lowering pattern on this toolchain rather than a common optimized
+  codegen choice.
+- Predicate-side logic is more nuanced: `PLOP3.LUT` is reproducible in the
+  optimized corpus, but the dedicated follow-up shows that it depends on the
+  exact compile lane. A minimal direct `-O3 -Xptxas -O3` build of
+  `probe_predicate_pressure.cu` does not retain `PLOP3.LUT`, while the fuller
+  compile-profile lane (`--use_fast_math --restrict --extra-device-vectorization
+  with the resolver-selected `nvcc` language mode; `-std=c++20` locally on
+  CUDA 13.1) does.
+
 ## Appendix C: Warp Shuffle and Vote
+
+Current Ada corpus note:
+- Across the completed recursive probe corpus plus the forced inline-PTX video
+  tranche, only five raw `V*` spellings are observed at all:
+  `VABSDIFF4.U8`, `VABSDIFF4.U8.ACC`, `VOTE.ALL`, `VOTE.ANY`, and `VOTEU.ANY`.
+- Of those, only `VABSDIFF4.U8` and `VABSDIFF4.U8.ACC` are true packed-video
+  ALU instructions. The rest belong to warp vote/ballot.
+
+#### VABSDIFF4 — Packed Video Absolute Difference
+
+```
+VABSDIFF4.U8 Rd, Ra, Rb, Rc ;  // packed u8x4 absolute difference, optional accumulate
+```
+
+Practical lowering notes from the Ada probe suite:
+
+- `__vabsdiffu4()` lowers directly to `VABSDIFF4.U8`.
+- `__vsadu4()` also uses `VABSDIFF4.U8`, then performs the horizontal sum with
+  ordinary integer instructions.
+- A dedicated inline-PTX probe
+  (`probe_video_isa_inline_ptx.cu` -> `video_isa_inline_ptx_20260320_084601`)
+  forces `vadd2`, `vsub2`, `vavrg2`, `vmin2`, `vmax2`, `vset2`, `vadd4`,
+  `vsub4`, `vavrg4`, `vmin4`, `vmax4`, `vset4`, and `vabsdiff4...add`, with
+  signed `vmin/vmax/vset` controls included as well.
+- In that forced PTX tranche, only the explicit accumulate form survives as a
+  raw packed-video SASS opcode, specifically `VABSDIFF4.U8.ACC`.
+- Follow-on inline-PTX probes
+  (`probe_video_scalar_isa_inline_ptx.cu` and
+  `probe_video_variant_isa_inline_ptx.cu`) force the remaining scalar PTX video
+  families: `vadd`, `vsub`, `vabsdiff`, `vmin`, `vmax`, `vshl`, `vshr`,
+  `vmad`, `vset`, `vabsdiff2`, and representative `.sat`, `.add`, and merge
+  forms.
+- Those scalar and variant probes also fail to surface additional raw packed-
+  video `V*` SASS on Ada. They lower to ordinary integer SASS involving
+  `PRMT`, `IMAD.IADD`, `IADD3`, `IADD3.X`, `IMAD.X`, `IMNMX`, `ISETP.*`,
+  `SHF.*`, `IABS`, and `LOP3.LUT`.
+- A third selector-heavy tranche (`probe_video_selector_isa_inline_ptx.cu`)
+  forces subfield selectors such as `.b0`, `.h1`, `.h10`, and `.b3210` across
+  `vadd`, `vsub`, `vmin`, `vmax`, `vset`, `vmad`, and `vabsdiff2`. Those
+  selector-biased forms still do not reveal any extra raw packed-video `V*`
+  instructions; they continue to synthesize into `PRMT`/`ISETP`/`SHF`/`IMAD`
+  sequences.
+- The rest of the CUDA SIMD-video intrinsics tested in this corpus
+  (`__vadd2/__vsub2/__vadd4/__vsub4/__vmax* / __vmin* / __vset* /
+  __viaddmax* / __viaddmin*`) lower to standard integer SASS such as
+  `IADD3`, `LOP3.LUT`, `PRMT`, `IMNMX`, `ISETP`, `SHF`, and `IMAD.IADD`
+  rather than additional `V*` opcodes.
 
 #### SHFL — Warp Shuffle
 
@@ -1358,6 +1625,12 @@ VOTE.UNI Rd, Pd, Ps ;          // Rd = 1 if all active lanes have same Ps value
 ```
 
 `VOTE` returns a 32-bit ballot mask (one bit per lane) in `Rd` and optionally sets a predicate `Pd`.
+
+In the current recursive Ada corpus, the observed raw vote spellings are:
+
+- `VOTE.ALL`
+- `VOTE.ANY`
+- `VOTEU.ANY`
 
 ---
 

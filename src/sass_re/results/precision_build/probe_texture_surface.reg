@@ -1,0 +1,31 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_tex_multi_fetch' for 'sm_89'
+ptxas info    : Function properties for probe_tex_multi_fetch
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 1.869 ms
+ptxas info    : Compiling entry function 'probe_surface_load_store' for 'sm_89'
+ptxas info    : Function properties for probe_surface_load_store
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 6 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.643 ms
+ptxas info    : Compiling entry function 'probe_tex_chain' for 'sm_89'
+ptxas info    : Function properties for probe_tex_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.917 ms
+ptxas info    : Compiling entry function 'probe_tex_3d_float' for 'sm_89'
+ptxas info    : Function properties for probe_tex_3d_float
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 19 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 6.655 ms
+ptxas info    : Compiling entry function 'probe_tex_2d_float' for 'sm_89'
+ptxas info    : Function properties for probe_tex_2d_float
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 17 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 4.262 ms
+ptxas info    : Compiling entry function 'probe_tex_1d_float' for 'sm_89'
+ptxas info    : Function properties for probe_tex_1d_float
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 0.570 ms

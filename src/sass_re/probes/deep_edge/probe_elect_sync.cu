@@ -1,4 +1,6 @@
 
+#include <cooperative_groups.h>
+
 // ELECT.SYNC: elect a single lane from active mask
 extern "C" __global__ void __launch_bounds__(32)
 elect_sync(int *out, const int *in) {

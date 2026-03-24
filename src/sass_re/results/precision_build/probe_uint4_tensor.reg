@@ -1,0 +1,11 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z24probe_uint4_tensor_chainPiPKvS1_' for 'sm_89'
+ptxas info    : Function properties for _Z24probe_uint4_tensor_chainPiPKvS1_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.952 ms
+ptxas info    : Compiling entry function '_Z18probe_uint4_tensorPiPKvS1_PKi' for 'sm_89'
+ptxas info    : Function properties for _Z18probe_uint4_tensorPiPKvS1_PKi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 384 bytes cmem[0]
+ptxas info    : Compile time = 1.006 ms

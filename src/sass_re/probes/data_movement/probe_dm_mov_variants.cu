@@ -12,7 +12,10 @@ dm_mov_imm(unsigned *out) {
     asm volatile("{.reg .pred p; setp.gt.u32 p, %1, 16; @p mov.u32 %0, 999; @!p mov.u32 %0, 0;}"
         :"=r"(r):"r"((unsigned)tid)); out[tid*4+2]=r;
     // Double MOV (64-bit via register pair)
+    unsigned long long wide;
     unsigned lo, hi;
-    asm volatile("mov.u64 {%0,%1}, 0xCAFEBABEDEADBEEF;":"=r"(lo),"=r"(hi));
+    asm volatile("mov.u64 %0, 0xCAFEBABEDEADBEEF;" : "=l"(wide));
+    lo = (unsigned)(wide & 0xffffffffull);
+    hi = (unsigned)(wide >> 32);
     out[tid*4+3]=lo^hi;
 }

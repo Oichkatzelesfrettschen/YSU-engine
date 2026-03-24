@@ -135,10 +135,10 @@ probe_tile_3d_8x8x4(float *out, const float *in, int nx, int ny, int nz) {
 // Double-buffered 3D tile with async copy (cp.async)
 #include <cuda_pipeline.h>
 
-extern "C" __global__ void __launch_bounds__(256)
+extern "C" __global__ void __launch_bounds__(64)
 probe_tile_3d_async(float *out, const float *in, int nx, int ny, int nz) {
     __shared__ float buf[2][10][10];
-    int tx = threadIdx.x % 8, ty = threadIdx.x / 8;
+    int tx = threadIdx.x % 8, ty = (threadIdx.x / 8) % 8;
     int bx = blockIdx.x * 8, by = blockIdx.y * 8;
     int gx = bx + tx, gy = by + ty;
 

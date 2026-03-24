@@ -1,0 +1,31 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_smem_pipeline_tile' for 'sm_89'
+ptxas info    : Function properties for probe_smem_pipeline_tile
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 1 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 4.564 ms
+ptxas info    : Compiling entry function 'probe_smem_sliding_window' for 'sm_89'
+ptxas info    : Function properties for probe_smem_sliding_window
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 1 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 7.442 ms
+ptxas info    : Compiling entry function 'probe_smem_transpose' for 'sm_89'
+ptxas info    : Function properties for probe_smem_transpose
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 1 barriers, 4224 bytes smem, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.251 ms
+ptxas info    : Compiling entry function 'probe_smem_xor_swizzle' for 'sm_89'
+ptxas info    : Function properties for probe_smem_xor_swizzle
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 1 barriers, 4096 bytes smem, 372 bytes cmem[0]
+ptxas info    : Compile time = 1.077 ms
+ptxas info    : Compiling entry function 'probe_smem_padded' for 'sm_89'
+ptxas info    : Function properties for probe_smem_padded
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 1 barriers, 4224 bytes smem, 372 bytes cmem[0]
+ptxas info    : Compile time = 1.022 ms
+ptxas info    : Compiling entry function 'probe_smem_row_major' for 'sm_89'
+ptxas info    : Function properties for probe_smem_row_major
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 1 barriers, 4096 bytes smem, 372 bytes cmem[0]
+ptxas info    : Compile time = 1.030 ms

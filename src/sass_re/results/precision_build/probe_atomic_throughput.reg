@@ -1,0 +1,41 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z19k_atomic_shared_allPi' for 'sm_89'
+ptxas info    : Function properties for _Z19k_atomic_shared_allPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 1 barriers, 4 bytes smem, 360 bytes cmem[0]
+ptxas info    : Compile time = 2.657 ms
+ptxas info    : Compiling entry function '_Z20k_atomic_shared_warpPi' for 'sm_89'
+ptxas info    : Function properties for _Z20k_atomic_shared_warpPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 1 barriers, 16 bytes smem, 360 bytes cmem[0]
+ptxas info    : Compile time = 2.164 ms
+ptxas info    : Compiling entry function '_Z21k_atomic_float_globalPfi' for 'sm_89'
+ptxas info    : Function properties for _Z21k_atomic_float_globalPfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 364 bytes cmem[0]
+ptxas info    : Compile time = 1.914 ms
+ptxas info    : Compiling entry function '_Z26k_atomic_float_uncontendedPfi' for 'sm_89'
+ptxas info    : Function properties for _Z26k_atomic_float_uncontendedPfi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 364 bytes cmem[0]
+ptxas info    : Compile time = 5.579 ms
+ptxas info    : Compiling entry function '_Z25k_atomic_global_contendedPii' for 'sm_89'
+ptxas info    : Function properties for _Z25k_atomic_global_contendedPii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 364 bytes cmem[0]
+ptxas info    : Compile time = 2.288 ms
+ptxas info    : Compiling entry function '_Z24k_atomic_block_contendedPii' for 'sm_89'
+ptxas info    : Function properties for _Z24k_atomic_block_contendedPii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 364 bytes cmem[0]
+ptxas info    : Compile time = 2.134 ms
+ptxas info    : Compiling entry function '_Z23k_atomic_warp_contendedPii' for 'sm_89'
+ptxas info    : Function properties for _Z23k_atomic_warp_contendedPii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 364 bytes cmem[0]
+ptxas info    : Compile time = 1.781 ms
+ptxas info    : Compiling entry function '_Z20k_atomic_uncontendedPii' for 'sm_89'
+ptxas info    : Function properties for _Z20k_atomic_uncontendedPii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 364 bytes cmem[0]
+ptxas info    : Compile time = 1.758 ms

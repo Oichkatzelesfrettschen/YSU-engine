@@ -1,0 +1,234 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepackage{tikz}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{groupplots}
+
+\definecolor{bg}{HTML}{0F1117}
+\definecolor{fg}{HTML}{E6EDF3}
+\definecolor{muted}{HTML}{8B949E}
+\definecolor{accentA}{HTML}{58A6FF}
+\definecolor{accentB}{HTML}{F2CC60}
+\definecolor{accentC}{HTML}{7EE787}
+\definecolor{accentD}{HTML}{FF7B72}
+\definecolor{panel}{HTML}{161B22}
+\pagecolor{bg}
+\color{fg}
+
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+
+\title{SM89 Frontier Monograph Synthesis}
+\author{YSU-Engine SASS RE Corpus}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This monograph distills the current SM89 reverse-engineering frontier into a
+bounded Ada-only evidence set. The broad inventory frontier is largely closed,
+while the residual high-value frontiers are byte-qualified \texttt{P2R.B*} form
+selection and \texttt{UPLOP3.LUT} semantic classification. The document uses a
+single processed-data archive as the source of truth for the prose and plots.
+\end{abstract}
+
+\section{Definitions}
+Let $F_T$ denote direct source/IR selection of target opcode family $T$,
+$G_T$ denote local cubin-side opcode validity, and $H_T$ denote semantic
+deviation under a tested pattern family. The core separation is:
+\[
+F_T \neq G_T \neq H_T.
+\]
+
+\section{Inventory Compression}
+\pgfplotstableread[col sep=comma]{../processed/monograph_20260323/inventory_numeric.csv}\inventorytable
+\begin{tikzpicture}
+\begin{axis}[
+    width=\textwidth,
+    height=7cm,
+    ybar,
+    bar width=10pt,
+    symbolic x coords={
+      Canonical optimized mnemonic frontier,
+      Strongest discovery-lane frontier,
+      Checked-in SM89 catalog rows
+    },
+    xtick=data,
+    xticklabel style={rotate=15,anchor=east,text=fg,font=\small},
+    ylabel={Count},
+    ylabel style={text=fg},
+    ymajorgrids=true,
+    grid style={draw=muted!35},
+    axis line style={draw=muted},
+    tick style={draw=muted},
+    yticklabel style={text=fg},
+    enlarge x limits=0.25,
+    nodes near coords,
+    every node near coord/.append style={text=fg,font=\small},
+    visualization depends on={value \thisrow{numeric_value} \as \rawy},
+    point meta=\rawy,
+]
+\addplot[fill=accentA,draw=accentA] table[
+    x=metric,
+    y expr=\thisrow{numeric_value},
+] {../processed/monograph_20260323/inventory_numeric.csv};
+\end{axis}
+\end{tikzpicture}
+
+\section{The P2R Frontier}
+\pgfplotstableread[col sep=comma]{../processed/monograph_20260323/p2r_frontier_numeric.csv}\pTwoRTable
+\begin{lemma}
+Reproducing a neighborhood and reproducing a specific selected opcode form are
+not equivalent events.
+\end{lemma}
+
+\begin{theorem}
+On the current SM89 stack, the residual \texttt{P2R.B*} problem is a
+form-selection problem rather than an opcode-existence problem.
+\end{theorem}
+
+\begin{tikzpicture}
+\begin{axis}[
+    width=\textwidth,
+    height=6cm,
+    xbar,
+    bar width=9pt,
+    symbolic y coords={
+      Best current interpretation,
+      Cubin-side local P2R.B1/B2/B3,
+      PTX/clang/Triton/simple ptxas sweep,
+      Local plain P2R 0x0f,
+      Local plain P2R 0x7f,
+      Direct local source/IR emission of P2R.B1/B2/B3
+    },
+    ytick=data,
+    yticklabel style={text=fg,font=\small},
+    xlabel={State score},
+    xlabel style={text=fg},
+    xmin=0,
+    xmax=2.4,
+    grid=major,
+    grid style={draw=muted!35},
+    axis line style={draw=muted},
+    tick style={draw=muted},
+    xticklabel style={text=fg},
+    nodes near coords,
+    every node near coord/.append style={text=fg,font=\small},
+]
+\addplot[fill=accentB,draw=accentB] table[x=score,y=axis] {../processed/monograph_20260323/p2r_frontier_numeric.csv};
+\end{axis}
+\end{tikzpicture}
+
+\section{The UPLOP3 Frontier}
+\pgfplotstableread[col sep=comma]{../processed/monograph_20260323/uplop3_runtime_class_counts.csv}\runtimeclass
+\pgfplotstableread[col sep=comma]{../processed/monograph_20260323/uplop3_live_site_numeric.csv}\livesites
+\pgfplotstableread[col sep=comma]{../processed/monograph_20260323/uplop3_pair_baseline_numeric.csv}\pairbase
+
+\begin{theorem}
+The structurally valid local cubin-side path for \texttt{UPLOP3.LUT} is
+\texttt{PLOP3 -> UPLOP3}; \texttt{ULOP3 -> UPLOP3} is invalid.
+\end{theorem}
+
+\begin{corollary}
+The local \texttt{UPLOP3} frontier is both structurally stratified and
+semantically stratified.
+\end{corollary}
+
+\begin{tikzpicture}
+\begin{groupplot}[
+    group style={group size=2 by 1, horizontal sep=1.6cm},
+    width=0.47\textwidth,
+    height=6cm,
+    axis line style={draw=muted},
+    tick style={draw=muted},
+    yticklabel style={text=fg},
+    xticklabel style={text=fg},
+    ylabel style={text=fg},
+    xlabel style={text=fg},
+    grid=major,
+    grid style={draw=muted!35},
+]
+\nextgroupplot[
+    ybar,
+    symbolic x coords={inert,stable_but_different},
+    xtick=data,
+    ylabel={Count},
+    nodes near coords,
+    every node near coord/.append style={text=fg,font=\small},
+]
+\addplot[fill=accentC,draw=accentC] table[x=class,y=count] {../processed/monograph_20260323/uplop3_runtime_class_counts.csv};
+
+\nextgroupplot[
+    ybar,
+    symbolic x coords={uniform_occ1,cutlass_occ5,uniform_occ2,cutlass_occ4,uniform_occ5,cooperative_occ1},
+    xtick=data,
+    xticklabel style={rotate=20,anchor=east,text=fg,font=\small},
+    ylabel={Best jaccard},
+    ymin=0,
+    ymax=0.45,
+    nodes near coords,
+    every node near coord/.append style={text=fg,font=\small},
+]
+\addplot[fill=accentD,draw=accentD] table[x=site,y=best_jaccard] {../processed/monograph_20260323/uplop3_live_site_numeric.csv};
+\end{groupplot}
+\end{tikzpicture}
+
+\section{Pair-Baseline Divergence}
+\begin{tikzpicture}
+\begin{axis}[
+    width=\textwidth,
+    height=7cm,
+    ybar,
+    bar width=9pt,
+    symbolic x coords={
+      uniform/occ1,
+      uniform/occ1_occ5,
+      uniform/occ1_occ2_occ5,
+      cutlass/occ4,
+      cutlass/occ4_occ5,
+      cutlass/occ2_occ4_occ5
+    },
+    xtick=data,
+    xticklabel style={rotate=20,anchor=east,text=fg,font=\small},
+    ylabel={Diff ratio},
+    ymin=0,
+    ymax=1.1,
+    grid=major,
+    grid style={draw=muted!35},
+    nodes near coords,
+    every node near coord/.append style={text=fg,font=\small},
+]
+\addplot[fill=accentA,draw=accentA] coordinates {
+    (uniform/occ1,0.708333)
+    (uniform/occ1_occ5,0.708333)
+    (uniform/occ1_occ2_occ5,0.458333)
+    (cutlass/occ4,1.0)
+    (cutlass/occ4_occ5,0.666667)
+    (cutlass/occ2_occ4_occ5,0.625000)
+};
+\end{axis}
+\end{tikzpicture}
+
+\section{Methodological Law}
+Differential fuzzing is the primary semantic discriminator, compute-sanitizer
+is the safety gate, and ncu/nsys are secondary observability channels. These
+roles are not interchangeable and should not be collapsed into one scalar
+notion of ``validation''.
+
+\section{Open Gaps}
+The remaining \texttt{P2R} gap is deeper form selection. The remaining
+\texttt{UPLOP3} gap is direct source/IR emission and motif-sensitive widening
+from the strongest live anchors.
+
+\end{document}

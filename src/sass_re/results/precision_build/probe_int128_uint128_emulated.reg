@@ -1,0 +1,21 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_uint128_mul64x64' for 'sm_89'
+ptxas info    : Function properties for probe_uint128_mul64x64
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.514 ms
+ptxas info    : Compiling entry function 'probe_int128_signed' for 'sm_89'
+ptxas info    : Function properties for probe_int128_signed
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.203 ms
+ptxas info    : Compiling entry function 'probe_uint128_shift' for 'sm_89'
+ptxas info    : Function properties for probe_uint128_shift
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 13 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.217 ms
+ptxas info    : Compiling entry function 'probe_uint128_add' for 'sm_89'
+ptxas info    : Function properties for probe_uint128_add
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.084 ms

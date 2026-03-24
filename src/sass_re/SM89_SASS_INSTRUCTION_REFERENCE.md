@@ -1,20 +1,161 @@
 # Ada Lovelace SM 8.9 SASS Instruction Reference
 
-Definitive inventory of all 448 SASS mnemonics observed on NVIDIA Ada Lovelace
-SM 8.9 (RTX 4070 Ti) with measured latencies and compilation flag requirements.
+Manifest-backed inventory of SASS mnemonics observed on NVIDIA Ada Lovelace
+SM 8.9 (RTX 4070 Ti), with measured latencies and compilation flag requirements.
 
-- Generated: 2026-03-19
+- Generated: 2026-03-20
 - Hardware: NVIDIA GeForce RTX 4070 Ti (AD104, SM 8.9, 60 SMs, 2625 MHz)
 - Compiler: CUDA 13.1 (nvcc V13.1.115)
-- Probes: 61 files in `src/sass_re/probes/`
-- Microbenchmarks: 13 files in `src/sass_re/microbench/`
-- Compilations: 1200 (60 probes x 20 flag combinations)
+- Probes: 349 recursive `probe_*.cu` files in `src/sass_re/probes/`
+- Manifest non-skip entries: 344
+- Compile-enabled entries in current manifest: 343
+- Compile-enabled entries in latest full refresh: 341
+- Microbenchmarks: 15 files in `src/sass_re/microbench/`
+- Canonical sweep model: recursive manifest + 6 comparison lanes
 - Latencies: measured via 512-deep dependent chains, ncu cross-validated
+- Latest aggregate run:
+  `src/sass_re/results/runs/full_recursive_20260320_182500`
+- Latest full-corpus flag sweep:
+  `src/sass_re/results/runs/flag_sweep_postfix_parallel6x4_20260320_233059`
+- Canonical optimized frontier: 379 raw mnemonics
+- Strongest discovery-lane frontier: 382 raw mnemonics (`--maxrregcount=32`)
+- Full-corpus verified flag movers:
+  - `--maxrregcount=32` -> `UISETP.EQ.U32.XOR`, `UISETP.GE.U32.AND`,
+    `UISETP.GT.AND`
+  - `--restrict` -> `I2F.S8`, `LDG.E.U16.CONSTANT`, `LDG.E.U8.CONSTANT`,
+    `LDL.LU`
+  - `-Xptxas -dlcm=cg` -> `LD.E.64.STRONG.GPU`,
+    `LDG.E.128.STRONG.GPU`, `LDG.E.64.STRONG.GPU`,
+    `LDG.E.S16.STRONG.GPU`, `LDG.E.S8.STRONG.GPU`,
+    `LDG.E.U16.STRONG.GPU`, `LDG.E.U8.STRONG.GPU`
+
+Mnemonic naming note:
+- `raw_sass` is the exact `cuobjdump -sass` spelling.
+- Some semantic families alias to different raw spellings on this toolchain.
+  Example: logical warp reduction AND is emitted as bare `REDUX`.
 
 Latency notation:
 - Exact values (e.g., "4.53 cy") are from direct measurement
 - Approximate values (e.g., "~4.53 cy") are inferred from same-pipeline instructions
 - Empty latency = not directly measured (SASS-only probe, no timing chain)
+- Section heading counts may lag the exact row inventory during active probing;
+  when they disagree, treat the table rows and the total count below as the
+  source of truth.
+
+Library-mined provisional note:
+- The canonical inventory below is still organized around direct local
+  `sm_89` probe observations.
+- A separate architecture-filtered cuDNN mining pass over packaged `sm_86`
+  cubins on this machine is recorded under
+  `src/sass_re/results/runs/cudnn_library_sm86_mining_20260320_103900`.
+- A direct local confirmation tranche under
+  `src/sass_re/results/runs/direct_confirm_20260320` has now promoted
+  `HFMA2.RELU`, `HMMA.1688.F32.TF32`, `LDSM.16.MT88.4`,
+  `LDGSTS.E.LTC128B.128`, `LDGSTS.E.LTC128B.128.ZFILL`,
+  `LDGSTS.E.BYPASS.LTC128B.128`, `LDGSTS.E.BYPASS.LTC128B.128.ZFILL`, and
+  `HMNMX2.NAN`, `F2FP.BF16.F32.PACK_AB`, and
+  `F2FP.RELU.BF16.F32.PACK_AB` into the canonical direct `sm_89` inventory.
+- A dedicated alias follow-up under
+  `src/sass_re/results/runs/f2fp_alias_followup_20260320` now shows that even
+  the closest local cuDNN-like source shape, packing a scalar with a compile-
+  time zero lane followed by `STG.E.U16`, still renders as
+  `F2FP.F16.F32.PACK_AB` or `F2FP.BF16.F32.PACK_AB` in both `cuobjdump` and
+  `nvdisasm`.
+- The remaining higher-value library-only candidates are therefore currently
+  best grouped as:
+  - likely library/disassembler aliases adjacent to direct local forms:
+    `F2FP.PACK_AB`, `F2FP.BF16.PACK_AB`
+  - still-unreproduced from direct source/IR predicate/uniform variants:
+    `P2R.B1`, `P2R.B2`, `P2R.B3`
+  - already directly observed but adjacent to the same frontier:
+    `R2P`, `USHF.L.U64.HI`, `ULOP3.LUT`
+- Follow-up direct probes `probe_p2r_mov_pack_inline_ptx.cu` and
+  `probe_tensor_uniform_predicate.cu` now provide sharpened negative evidence:
+  the local compiler still lowers those patterns to `ISETP`/`SEL`/`LOP3` or
+  `@!UPT UIADD3` scaffolding instead of surfacing `P2R.B*` or `UPLOP3.LUT`.
+- A stricter uniform follow-up under
+  `src/sass_re/results/runs/p2r_uniform_strict_20260320` now directly confirms
+  `ULEA.HI.X.SX32` on local `sm_89`, but still only reaches `USHF.L.U32` plus
+  GPR-space `SHF.L.U64.HI` rather than fully uniform `USHF.L.U64.HI`.
+- The latest follow-up under
+  `src/sass_re/results/runs/uplop3_p2r_followup_20260320` sharpens those last
+  two gaps further. `probe_p2r_vector_pack_inline_ptx.cu` uses
+  predicate-derived byte lanes plus `mov.b32` vector packing before merging
+  into a live destination register, but still lowers to
+  `ISETP`/`SEL`/`PRMT`/`LOP3` glue instead of `P2R.B1/B2/B3`. Meanwhile
+  `probe_uniform_async_tensor_pipeline.cu` reproduces the local cuDNN-like
+  uniform logic neighborhood by combining
+  `LDGSTS.E.BYPASS.LTC128B.128`, `HMMA.1688.F32.TF32`, `@!UPT UIADD3`, and
+  dense `PLOP3.LUT` with `0x40`/`0x80` immediates. Direct local `ULOP3.LUT`
+  is already observed elsewhere in the uniform-path corpus, but the exact
+  library-mined `UPLOP3.LUT` spelling still does not appear verbatim in local
+  direct probes.
+- A stricter follow-up under
+  `src/sass_re/results/runs/p2r_uplop3_stage_followup_20260320` pushes both
+  motifs harder again. `probe_p2r_banked_reload.cu` mirrors a longer-lived
+  banked predicate-save lifecycle, but still lowers to
+  `ISETP`/`SEL`/`LOP3`/`PRMT`/`IMAD` glue rather than `P2R.B1/B2/B3`.
+  `probe_uniform_stage_toggle_pipeline.cu` rebuilds a tighter software-
+  pipelined tensor mainloop and directly reproduces
+  `HMMA.1688.F32.TF32`, `LDGSTS.E.BYPASS.LTC128B.128`,
+  `LDGSTS.E.BYPASS.LTC128B.128.ZFILL`, dense `PLOP3.LUT`, and repeated
+  `@!UPT UIADD3` / `R2UR` scaffolding, but still does not emit raw
+  `UPLOP3.LUT`.
+- An exact predicate/uniform tranche under
+  `src/sass_re/results/runs/predicate_uniform_frontier_20260321_031500`
+  reconciles an important erratum: base `R2P` is already directly observed in
+  `probe_transcendentals.sass` and `probe_fp64_transcendentals.sass`. The new
+  exact probes still do not surface `P2R.B1/B2/B3`, `UPLOP3.LUT`, or
+  `USHF.L.U64.HI`, but they do reproduce stronger nearby local forms such as
+  `ULOP3.LUT`, `USEL`, `UISETP.NE.U32.AND`, `ULDC.64`,
+  `HMMA.1688.F32.TF32`, and `LDGSTS.E.BYPASS.LTC128B.128(.ZFILL)`.
+- A tighter same-carrier predicate follow-up under
+  `src/sass_re/results/runs/p2r_two_stage_bank_20260321_110000` now directly
+  reproduces `P2R R0, PR, R0, 0x7f` on local `sm_89`. That closes the broader
+  full-mask same-carrier predicate-pack shape and leaves the byte-qualified
+  `P2R.B1/B2/B3` family as the real remaining direct-local gap in this corner.
+- A newer literal byte-bank extension under
+  `src/sass_re/results/runs/p2r_b1_literal_cudnn_20260321_115500` and
+  `src/sass_re/results/runs/p2r_b23_literal_cudnn_20260321_122400` pushes that
+  same-carrier neighborhood across byte-one, byte-two, and byte-three rewrite
+  shapes. All three still lower through `ISETP` + `SEL` + `LOP3.LUT` glue
+  rather than surfacing `P2R.B1`, `P2R.B2`, or `P2R.B3`, which tightens the
+  boundary around the whole byte-qualified family.
+- A final uniform-u64 follow-up under
+  `src/sass_re/results/runs/ushf_u64_hi_final_20260320` tests cleaner
+  constant-backed and parameter-backed 64-bit shift families. It directly
+  confirms `ULEA` and `ULEA.HI.X` in the uniform address path, but still does
+  not reproduce `USHF.L.U64.HI`; the compiler continues to use GPR-space
+  `SHF.L.U64.HI` or `SHF.R.U64` for the actual 64-bit-high shift.
+- A direct prefix cleanup tranche under
+  `src/sass_re/results/runs/prefix_direct_followup_20260320` now promotes
+  `LDC.U8` and `LDC.S8` into the canonical direct local inventory. The same
+  tranche also tested a wider `UISETP` sweep, but those source shapes still
+  lower to ordinary `ISETP` plus `SEL` rather than surfacing the broader
+  library-mined `UISETP.*` family.
+- A final CUTLASS-like tensor follow-up under
+  `src/sass_re/results/runs/cutlass_predicate_pipeline_20260320` now produces
+  the strongest direct local optimized neighborhood around the unresolved
+  predicate cluster: base `P2R`, `PLOP3.LUT`, `HMMA.1688.F32.TF32`,
+  `LDGSTS.E.BYPASS.LTC128B.128*`, and `@!UPT UIADD3`. Even there, it still does
+  not emit `P2R.B1/B2/B3` or `UPLOP3.LUT`.
+- A final direct-local cluster follow-up under
+  `src/sass_re/results/runs/final_cluster_followup_20260320` adds a
+  reconvergence-heavy predicate-save path and a tighter uniform stage-FSM path
+  with loop-carried U64 rebasing. A newer exact follow-up under
+  `predicate_uniform_frontier_20260321_024500` finally closes one of those
+  gaps by directly confirming `USHF.L.U64.HI` on local `sm_89`, while
+  `P2R.B1/B2/B3` and `UPLOP3.LUT` remain unreproduced.
+- The strongest still-provisional prefix-driven candidates from library mining
+  are now:
+  - direct source/IR gap: `P2R.B1`, `P2R.B2`, `P2R.B3`, `UPLOP3.LUT`
+  - cubin-side materialization now exists for `P2R.B1`, `P2R.B2`, and
+    `P2R.B3`; `UPLOP3.LUT` remains the stronger unresolved non-cubin frontier
+  - `LDC.S8`, `LDC.U8` are no longer provisional; they are now direct local
+    confirmations
+  - second-tier candidates worth future direct probing include `BRXU`,
+    `USEL`, `LDG.E.STRONG.GPU`, `LDG.E.128.STRONG.GPU`, `LDG.E.EF.128`,
+    `LDL.LU.64`, and the wider `UISETP.*` family
 
 ---
 
@@ -53,7 +194,7 @@ Latency notation:
 | `RED.E.DEC.STRONG.GPU` |  | atomicAdd() [reduction, no return] | atomic sweep probes | **Global reduction wrapping decrement** with strong ordering |
 | `RED.E.INC.STRONG.GPU` |  | atomicAdd() [reduction, no return] | atomic sweep probes | **Global reduction wrapping increment** with strong ordering |
 | `RED.E.MIN.S32.STRONG.GPU` |  | atomicAdd() [reduction, no return] | shared atomics probes | Global reduction min (signed INT32, strong ordering) |
-| `REDUX` |  |  | shared atomics probes | Bare warp reduction (no type suffix, compiler-selected) |
+| `REDUX` |  | __reduce_and_sync() / redux.sync.and.b32 | atomic sweep probes | Bare raw SASS spelling for logical AND on this CUDA 13.1 toolchain. Treat semantic family as `REDUX.AND`. |
 | `REDUX.MAX` |  | __reduce_max_sync() | atomic sweep probes | Warp-level max (bare, without .S32 suffix) |
 | `REDUX.MIN` |  | __reduce_min_sync() | atomic sweep probes | Warp-level min (bare, without .S32 suffix) |
 | `REDUX.MAX.S32` | ~60 cy | __reduce_max_sync() | default | |
@@ -113,6 +254,15 @@ Latency notation:
 | `BAR.SYNC` | 35.01 cy | __syncthreads() | default | Block-level barrier. |
 | `BAR.SYNC.DEFER_BLOCKING` |  | __syncthreads() | default | |
 | `DEPBAR.LE` |  | dependency barrier | default | |
+
+Recent `mbarrier` lowering note:
+- `cuda_awbarrier_primitives.h` probes on Ada SM89 lower through
+  `BAR.SYNC.DEFER_BLOCKING`, `MEMBAR.ALL.CTA`, `ATOMS.ARRIVE.64`, and
+  `ATOMS.POPC.INC.32` rather than exposing a distinct raw `MBAR*` mnemonic in
+  `cuobjdump -sass` on this CUDA 13.1 toolchain.
+- The safe init/arrive/wait and arrive-drop flows run correctly in the dedicated
+  runner. `__mbarrier_try_wait()` compiles, but the emitted path behaves like a
+  trap-style negative control during live launch and is tracked as disassembly-only.
 
 ### Bit Manipulation (25 mnemonics)
 
@@ -192,10 +342,11 @@ Latency notation:
 | `F2F.F16.F32.RZ` |  |  | default | |
 | `F2F.F32.F64` |  |  | default | |
 | `F2F.F64.F32` |  |  | default | |
-| `F2FP.BF16.F32.PACK_AB` | ~8.54 cy (BF16 round-trip) | format conversion | default | |
+| `F2FP.BF16.F32.PACK_AB` | ~8.54 cy (BF16 round-trip) | format conversion | default | Direct local `sm_89` form. Alias follow-up still does not collapse this to shorter library-mined `F2FP.BF16.PACK_AB` locally. |
+| `F2FP.RELU.BF16.F32.PACK_AB` |  | asm `cvt.rn.relu.bf16x2.f32` | direct confirm tranche | Packed BF16 convert with ReLU clamp from forced inline PTX. |
 | `F2FP.F16.E4M3.UNPACK_B` | ~6 cy (FP8 decode) | format conversion | default | |
 | `F2FP.F16.E5M2.UNPACK_B` | ~6 cy (FP8 E5M2 decode) | format conversion | default | |
-| `F2FP.F16.F32.PACK_AB` | ~10.54 cy (FP16 round-trip) | format conversion | default | |
+| `F2FP.F16.F32.PACK_AB` | ~10.54 cy (FP16 round-trip) | format conversion | default | Direct local `sm_89` form. Alias follow-up still does not collapse this to shorter library-mined `F2FP.PACK_AB` locally. |
 | `F2FP.F16.F32.PACK_AB.RZ` | ~~10.54 (similar) | format conversion | default | |
 | `F2FP.SATFINITE.E4M3.F32.PACK_AB_MERGE_C` | ~18.54 cy (FP8 round-trip) | format conversion | default | |
 | `F2FP.SATFINITE.E5M2.F32.PACK_AB_MERGE_C` | ~18.53 cy (FP8 E5M2 round-trip) | format conversion | default | |
@@ -236,19 +387,22 @@ Latency notation:
 | `MOV` | ~2 cy (register move) | register assignment | default | |
 | `SEL` | ~4.53 cy | ternary select | default | |
 
-### FP16/BF16 Packed + Tensor Core Float (10 mnemonics)
+### FP16/BF16 Packed + Tensor Core Float (14 mnemonics)
 
 | Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
 |---|---|---|---|---|
 | `HADD2` | 4.54 cy | __hadd2() | default | |
 | `HADD2.F32` | ~4.54 cy | __hadd2() | default | |
 | `HFMA2` | 4.54 cy | __hfma2() | default | |
+| `HFMA2.RELU` |  | asm `fma.rn.relu.f16x2` | direct confirm tranche | Direct local `sm_89` confirmation from forced inline PTX. |
 | `HFMA2.BF16_V2` | 4.01 cy (FASTEST FMA on Ada) | __hfma2(bfloat162) | default | |
 | `HMMA.16816.F16` | 42.14 cy/WMMA (fastest float TC) | wmma::mma_sync() [tensor core] | default | |
 | `HMMA.16816.F32` | 66.28 cy/WMMA (256 FMA) | wmma::mma_sync() [tensor core] | default | |
 | `HMMA.16816.F32.BF16` | 66.33 cy/WMMA (=FP16->FP32) | wmma::mma_sync() [tensor core] | default | |
 | `HMMA.1684.F32.TF32` | 66.66 cy/2xHMMA (TF32 via 2 instructions) | wmma::mma_sync() [tensor core] | default | |
+| `HMMA.1688.F32.TF32` |  | asm `mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32` | direct confirm tranche | Direct local `sm_89` confirmation of the single-instruction TF32 m16n8k8 form. |
 | `HMNMX2` |  | __hmax2()/__hmin2() | default | |
+| `HMNMX2.NAN` |  | asm `min.NaN/max.NaN.f16x2` | direct confirm tranche | Direct local `sm_89` confirmation of NaN-aware packed half2 min/max lowering. |
 | `HSETP2.GTU.AND` |  | __hgt2()/__hle2() | edge atomics probes | **Half2 packed comparison set-predicate** (greater-than-unordered, AND combiner). FP16 packed comparison -- first observation. |
 | `HSETP2.LE.AND` |  | __hgt2()/__hle2() | -G debug + expanded probes | Half2 packed less-or-equal comparison. Second FP16 packed comparison variant. |
 | `HMUL2` | ~4.54 cy (only with -fmad=false) | __hmul2() (-fmad=false) | -fmad=false | |
@@ -332,7 +486,7 @@ Latency notation:
 | `MEMBAR.SC.CTA` |  | __threadfence_block() | default | |
 | `MEMBAR.SC.GPU` |  |  | default | |
 | `MEMBAR.SC.SYS` | 2583.37 cy (system-scope) | __threadfence_system() | default | |
-| `MEMBAR.SC.VC` |  |  | -G | |
+| `MEMBAR.SC.VC` |  | debug-lane memory ordering | -G dedicated follow-up | Reproduced by `probe_membar_sc_vc_debug.cu` and `probe_r2ur_debug_path.cu` in `-O0 -G`; absent from the optimized lane for the same kernels. |
 
 ### Integer Arithmetic (24 mnemonics)
 
@@ -341,7 +495,10 @@ Latency notation:
 | `IABS` | 0.26 cy/pair (sub-cycle modifier) | abs(int) | default | |
 | `IADD3` | 2.52 cy | a + b (int32) | default | |
 | `IADD3.X` | ~2.59 cy (carry propagation) | a + b (int32) | default | |
-| `IDP.4A.S8.S8` | 4.53 cy (4x effective INT8) | __dp4a() [INT8 dot product] | default | |
+| `IDP.4A.S8.S8` | 4.53 cy (4x effective INT8) | __dp4a() / dp4a.s32.s32 | default + signedness probe | Signed x signed packed INT8 dot product. |
+| `IDP.4A.S8.U8` | 4.53 cy (same pipe as S8.S8) | dp4a.s32.u32 | signedness probe | Signed x unsigned packed INT8 dot product. |
+| `IDP.4A.U8.S8` | 4.53 cy (same pipe as S8.S8) | dp4a.u32.s32 | signedness probe | Unsigned x signed packed INT8 dot product. |
+| `IDP.4A.U8.U8` | 4.53 cy (same pipe as S8.S8) | dp4a.u32.u32 | signedness probe | Unsigned x unsigned packed INT8 dot product. |
 | `IMAD` | 4.53 cy | a * b + c (int32) | default | |
 | `IMAD.HI` | ~4.53 cy | a * b + c (int32) | default | |
 | `IMAD.HI.U32` | ~4.53 cy | a * b + c (int32) | default | |
@@ -397,17 +554,21 @@ Latency notation:
 | `ISETP.NE.OR` |  | a > b (int comparison) | default | |
 | `ISETP.NE.U32.AND` |  | a > b (int comparison) | default | |
 
-### Memory Constant (4 mnemonics)
+### Memory Constant (8 mnemonics)
 
 | Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
 |---|---|---|---|---|
 | `LDC` | 70.57 cy (constant cache chain) | constant memory (__constant__) | default | |
 | `LDC.64` |  | constant memory (__constant__) | default | |
+| `LDC.S8` |  | constant memory (__constant__) | direct prefix follow-up | Direct local signed 8-bit constant-memory load from `probe_ldc_subword.cu`. |
 | `LDC.U16` |  | constant memory (__constant__) | -G debug + expanded probes | Unsigned 16-bit constant memory load (sub-word constant cache) |
+| `LDC.U8` |  | constant memory (__constant__) | direct prefix follow-up | Direct local unsigned 8-bit constant-memory load from `probe_ldc_subword.cu`. |
 | `ULDC` |  |  | default | |
 | `ULDC.64` |  |  | default | |
+| `ULDC.S8` |  | `probe_uniform_exotic.cu` | direct confirm tranche | Uniform signed 8-bit constant-memory load from a warp-uniform constant-table index. |
+| `ULDC.U8` |  | `probe_uniform_exotic.cu` | direct confirm tranche | Uniform unsigned 8-bit constant-memory load from a warp-uniform constant-table index. |
 
-### Memory Global (47 mnemonics)
+### Memory Global (51 mnemonics)
 
 | Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
 |---|---|---|---|---|
@@ -440,9 +601,13 @@ Latency notation:
 | `LDGDEPBAR` | ~0 cy (barrier token, not execution) | __pipeline_commit() | default | |
 | `LDGSTS.E` | 363.28 cy/iter (async copy with sync) | cp.async / __pipeline_memcpy_async() | default | |
 | `LDGSTS.E.64.ZFILL` | ~363.28 (similar) | cp.async / __pipeline_memcpy_async() | -G | |
-| `LDGSTS.E.BYPASS.128` | ~363.28 (similar) | cp.async / __pipeline_memcpy_async() | default | |
-| `LDGSTS.E.BYPASS.128.ZFILL` | ~363.28 (similar) | cp.async / __pipeline_memcpy_async() | -G | |
-| `LDGSTS.E.ZFILL` | ~363.28 (similar) | cp.async / __pipeline_memcpy_async() | -G | |
+| `LDGSTS.E.BYPASS.128` | ~363.28 (similar) | cp.async ignore-src lowering | explicit cp.async probe | Predicated non-`ZFILL` ignore-src lowering. |
+| `LDGSTS.E.BYPASS.LTC128B.128` |  | asm `cp.async.cg.shared.global.L2::128B ..., 16` | direct confirm tranche | Direct local `sm_89` confirmation of the `.cg` L2 prefetch-hint path. |
+| `LDGSTS.E.BYPASS.LTC128B.128.ZFILL` |  | asm `cp.async.cg.shared.global.L2::128B ..., 16, 8` | direct confirm tranche | `.cg` L2 prefetch-hint path with zero fill. |
+| `LDGSTS.E.BYPASS.128.ZFILL` | ~363.28 (similar) | cp.async.cg.shared.global ..., 16, 8 | explicit cp.async probe | 16-byte bypass path with zero fill. |
+| `LDGSTS.E.LTC128B.128` |  | asm `cp.async.ca.shared.global.L2::128B ..., 16` | direct confirm tranche | Direct local `sm_89` confirmation of the `.ca` L2 prefetch-hint path. |
+| `LDGSTS.E.LTC128B.128.ZFILL` |  | asm `cp.async.ca.shared.global.L2::128B ..., 16, 8` | direct confirm tranche | `.ca` L2 prefetch-hint path with zero fill. |
+| `LDGSTS.E.ZFILL` | ~363.28 (similar) | cp.async.ca.shared.global ..., 4, 2 | explicit cp.async probe | 4-byte zero-fill path. |
 | `ST.E` |  |  | default | |
 | `ST.E.128` |  |  | default | |
 | `ST.E.64` |  |  | default | |
@@ -488,11 +653,55 @@ Latency notation:
 | `STS.64` |  | shared memory store | -O3 no-restrict | 64-bit shared memory store (without --restrict) |
 | `STS.U16` |  | shared memory store | default | |
 
-### SIMD Video (1 mnemonic)
+### SIMD Video (2 mnemonics)
 
 | Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
 |---|---|---|---|---|
-| `VABSDIFF4.U8` |  | __vabsdiffu4() | SIMD video probes | **Packed INT8x4 absolute difference.** First and only "V" (video) instruction on Ada. All other SIMD video intrinsics decompose to standard IADD3/LOP3/PRMT. |
+| `VABSDIFF4.U8` |  | __vabsdiffu4() | SIMD video probes | **Packed INT8x4 absolute difference.** Baseline packed-video opcode on Ada. Most other SIMD video intrinsics still decompose to standard integer SASS. |
+| `VABSDIFF4.U8.ACC` |  | inline PTX `vabsdiff4...add`, __vsadu4() lowering pattern | forced inline PTX video probe | **Packed INT8x4 absolute difference with accumulate.** Observed when `vabsdiff4` is forced with an explicit add/accumulate operand. |
+
+SIMD-video lowering note from the recursive Ada corpus:
+- `__vsadu4()` still reaches native video hardware, but only through
+  `VABSDIFF4.U8` followed by integer horizontal-byte accumulation.
+- The trap-resistant inline-PTX probe `probe_video_isa_inline_ptx.cu` confirms:
+  `vadd2/vsub2 -> IADD3 + LOP3.LUT`, `vadd4/vsub4 -> LOP3.LUT + IMAD.IADD`,
+  `vavrg2 -> LOP3.LUT + SHF + IMAD.IADD`, `vavrg4 -> PRMT + SHF + IMAD.IADD`,
+  `vmin2/vmax2 -> IMNMX.U32`, `vmin2.s32/vmax2.s32 -> PRMT + IMNMX`,
+  `vmin4/vmax4 -> PRMT + IMNMX`, `vset2/vset4 -> PRMT + ISETP + LOP3.LUT`,
+  `vset2.s32/vset4.s32 -> PRMT + ISETP + LOP3.LUT`, and
+  `vabsdiff4...add -> VABSDIFF4.U8.ACC`.
+- The follow-on probes `probe_video_scalar_isa_inline_ptx.cu` and
+  `probe_video_variant_isa_inline_ptx.cu` confirm that scalar PTX video
+  instructions also synthesize on Ada:
+  `vadd/vsub -> IMAD.IADD`, `vabsdiff -> IADD3 + IADD3.X + ISETP`,
+  `vmin/vmax -> PRMT + ISETP`, `vshl/vshr -> SHF + predicate/setp plumbing`,
+  `vmad -> PRMT + shifts/adds/multiply helpers`, `vset -> PRMT + ISETP`,
+  and `vabsdiff2 -> IABS + shift/add glue`.
+- `__vadd2`, `__vsub2`, `__vadd4`, `__vsub4`, `__vmax*`, `__vmin*`,
+  `__viaddmax*`, `__viaddmin*`, `__vset2`, and `__vset4` do **not** emit extra
+  `V*` raw SASS on this toolkit. They lower to combinations of `IADD3`,
+  `LOP3.LUT`, `PRMT`, `IMNMX`, and `ISETP`.
+- Recompiling the entire `simd_video` slice under both `-O0 -G` and
+  `-O3 -Xptxas -O3` does not add any new raw packed-video `V*` spellings.
+  `-G` changes the surrounding support code and surfaces debug/control mnemonics
+  such as `BPT.TRAP`, `BSSY`, `BSYNC`, `LDC`, `LDL`, and `STL`, but not new
+  packed-video ALU opcodes.
+- Recompiling the scalar/variant inline-PTX tranches under both `-O0 -G` and
+  `-O3 -Xptxas -O3` also does not add any new raw `V*` spellings.
+- The selector-heavy tranche `probe_video_selector_isa_inline_ptx.cu`
+  confirms the same result for merge selectors and packed subfield forms:
+  `.b0`, `.h1`, `.h10`, `.b3210`, `vset*.add`, and `vabsdiff2` still lower to
+  `PRMT`/`ISETP`/`SHF`/`IMAD` glue rather than exposing new raw packed-video
+  `V*` opcodes.
+- `PLOP3.LUT` remains a mainline mnemonic, not a debug appendix artifact.
+  The follow-up bundle `predicate_logic_followup_20260320_091700` shows that a
+  minimal direct `-O3 -Xptxas -O3` build of `probe_predicate_pressure.cu` does
+  not retain `PLOP3.LUT`, but the full compile-profile lane used by the main
+  corpus (`--use_fast_math --restrict --extra-device-vectorization` with the
+  resolver-selected `nvcc` language mode; `-std=c++20` locally on CUDA 13.1)
+  does reproduce `PLOP3.LUT` and `P2R` in optimized code.
+- Across the completed recursive run, the only observed raw `V*` mnemonics are
+  `VABSDIFF4.U8`, `VABSDIFF4.U8.ACC`, `VOTE.ALL`, `VOTE.ANY`, and `VOTEU.ANY`.
 
 ### Other (6 mnemonics)
 
@@ -527,7 +736,7 @@ Latency notation:
 | `CS2R.32` |  |  | default | |
 | `P2R` |  | predicate spill to register | --use_fast_math | |
 | `R2P` |  | predicate reload | default | |
-| `R2UR` |  |  | -G | |
+| `R2UR` |  | debug-lane register-to-uniform transfer | -G dedicated follow-up | Reproduced by `probe_r2ur_debug_path.cu` and the debug lane of `probe_membar_sc_vc_debug.cu`; not observed in the optimized lane for the same kernels. |
 | `S2R` |  | threadIdx/blockIdx/clock | default | |
 | `S2UR` |  |  | default | |
 
@@ -542,25 +751,36 @@ Latency notation:
 | `IMMA.8832.U4.U4` | 28.05 cy/WMMA (=INT4 S4) | wmma::mma_sync() [INT TC] | default | |
 | `IMMA.8832.U4.U4.SAT` | ~28.05 (similar) | wmma::mma_sync() [INT TC] | -G | |
 | `LDSM.16.M88.4` | ~28 cy (shared memory matrix load) | wmma::load_matrix_sync() [from smem] | default | |
+| `LDSM.16.MT88.4` |  | asm `ldmatrix.sync.aligned.m8n8.x4.trans.shared.b16` | direct confirm tranche | Direct local `sm_89` confirmation of the transposed x4 matrix-load form. |
 | `MOVM.16.MT88` |  | register assignment | -G | |
 
-### Texture/Surface (11 mnemonics)
+### Texture/Surface (15 mnemonics)
 
 | Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
 |---|---|---|---|---|
 | `SULD.D.BA.1D.STRONG.SM` |  | surface load | default | |
 | `SULD.D.BA.1D.STRONG.SM.IGN` |  | surface load | default | |
 | `SULD.D.BA.1D.STRONG.SM.TRAP` |  | surface load | default | |
+| `SULD.D.BA.2D.STRONG.SM` |  | surface load | TMU behavior probe | 2D surface load used by boundary-mode validation. |
+| `SULD.D.BA.2D.STRONG.SM.IGN` |  | surface load | TMU behavior probe | 2D surface load with ignore/zero boundary behavior. |
 | `SUST.D.BA.1D.STRONG.SM` |  | surface store | default | |
 | `SUST.D.BA.1D.STRONG.SM.IGN` |  | surface store | default | |
 | `SUST.D.BA.1D.STRONG.SM.TRAP` |  | surface store | default | |
+| `SUST.D.BA.2D.STRONG.SM.TRAP` |  | surface store | TMU behavior probe | 2D surface store path. |
 | `TEX.B.LL` |  | tex1D/2D/3D fetch | default | |
 | `TEX.SCR.B.LL` |  | tex1D/2D/3D fetch | default | |
 | `TEX.SCR.LL` |  | tex1D/2D/3D fetch | default | |
 | `TLD.SCR.B.LZ` |  | texture load | default | |
 | `TLD.SCR.LZ` |  | texture load | default | |
 
-### Uniform Datapath (12 mnemonics)
+Texture/TMU note:
+- The dedicated TMU runner validates point vs linear filtering, clamp/border/
+  wrap/mirror address modes, and 1D/2D/3D interpolation against a CPU oracle.
+- Manual bilinear/trilinear kernels show dense `FFMA` clusters that are absent
+  from the hardware-filtered `TEX` kernels, which is the evidence for TMU
+  interpolation offload.
+
+### Uniform Datapath (22 mnemonics)
 
 | Mnemonic | Measured Latency | CUDA/PTX Intrinsic | Flags | Notes |
 |---|---|---|---|---|
@@ -584,6 +804,8 @@ Latency notation:
 | `USHF.R.U32.HI` |  |  | bitops tiling probes | Uniform unsigned right shift high |
 | `ULEA` | ~2.5 cy (uniform pipeline) |  | tiling probes | Uniform load effective address. Opcode 0x7891. |
 | `ULEA.HI` |  |  | data movement probes | **Uniform LEA high.** Upper 32 bits of 64-bit uniform address computation. |
+| `ULEA.HI.X` |  | warp-uniform 64-bit address carry | final uniform-u64 follow-up | Direct local `sm_89` confirmation from `probe_uniform_ushf_u64_hi_final.cu`. |
+| `ULEA.HI.X.SX32` |  | warp-uniform signed byte-offset address generation | strict uniform follow-up | Direct local `sm_89` confirmation from `probe_uniform_u64_strict.cu`. |
 
 ### Warp Vote/Match/Redux (7 mnemonics)
 
@@ -597,9 +819,14 @@ Latency notation:
 | `WARPSYNC` |  | __syncwarp() | default | |
 | `WARPSYNC.EXCLUSIVE` |  | __syncwarp() | -G | |
 
+Warp-vote note:
+- `VOTE.*` belongs to warp vote/ballot, not the packed SIMD-video family.
+- In the current Ada corpus, `VOTE.ALL`, `VOTE.ANY`, and `VOTEU.ANY` are the
+  only non-video `V*` raw spellings observed.
+
 ---
 
-**Total: 448 unique SASS mnemonics across 25 categories.**
+**Total: 470 unique SASS mnemonics across 25 categories.**
 
 All latencies measured on RTX 4070 Ti (SM 8.9, 2625 MHz, 60 SMs).
 See `RESULTS.md` for measurement methodology, ncu cross-validation,

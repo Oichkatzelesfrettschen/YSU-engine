@@ -1,0 +1,36 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_bmsk' for 'sm_89'
+ptxas info    : Function properties for probe_bmsk
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 16 registers, used 0 barriers, 360 bytes cmem[0]
+ptxas info    : Compile time = 1.290 ms
+ptxas info    : Compiling entry function 'probe_bfe_unpack' for 'sm_89'
+ptxas info    : Function properties for probe_bfe_unpack
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 18 registers, used 0 barriers, 384 bytes cmem[0]
+ptxas info    : Compile time = 0.715 ms
+ptxas info    : Compiling entry function 'probe_bfi_pack' for 'sm_89'
+ptxas info    : Function properties for probe_bfi_pack
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 384 bytes cmem[0]
+ptxas info    : Compile time = 0.688 ms
+ptxas info    : Compiling entry function 'probe_flo' for 'sm_89'
+ptxas info    : Function properties for probe_flo
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.549 ms
+ptxas info    : Compiling entry function 'probe_popc_chain' for 'sm_89'
+ptxas info    : Function properties for probe_popc_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.836 ms
+ptxas info    : Compiling entry function 'probe_brev_chain' for 'sm_89'
+ptxas info    : Function properties for probe_brev_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.093 ms
+ptxas info    : Compiling entry function 'probe_brev' for 'sm_89'
+ptxas info    : Function properties for probe_brev
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.491 ms

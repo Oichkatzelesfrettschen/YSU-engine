@@ -1,0 +1,27 @@
+probes/probe_warp_elect_activemask.cu(45): warning #177-D: variable "val" was declared but never referenced
+      float val = in[i];
+            ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_warpsync_partial' for 'sm_89'
+ptxas info    : Function properties for probe_warpsync_partial
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 128 bytes smem, 368 bytes cmem[0]
+ptxas info    : Compile time = 2.360 ms
+ptxas info    : Compiling entry function 'probe_warpsync' for 'sm_89'
+ptxas info    : Function properties for probe_warpsync
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 128 bytes smem, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.943 ms
+ptxas info    : Compiling entry function 'probe_activemask' for 'sm_89'
+ptxas info    : Function properties for probe_activemask
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.915 ms
+ptxas info    : Compiling entry function 'probe_warp_elect' for 'sm_89'
+ptxas info    : Function properties for probe_warp_elect
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 8 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 1.062 ms

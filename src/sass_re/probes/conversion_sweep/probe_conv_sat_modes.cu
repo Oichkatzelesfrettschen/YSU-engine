@@ -10,7 +10,12 @@ conv_f2i_sat(int *out, const float *in) {
     unsigned sat_u32;
     asm volatile("cvt.rni.sat.u32.f32 %0,%1;":"=r"(sat_u32):"f"(v)); // Unsigned SAT
     out[i*3+1]=(int)sat_u32;
-    short sat_s16;
-    asm volatile("cvt.rni.sat.s16.f32 %0,%1;":"=r"(sat_s16):"f"(v)); // 16-bit SAT
-    out[i*3+2]=(int)sat_s16;
+    unsigned short sat_s16_bits;
+    asm volatile(
+        "{ .reg .s16 t16;"
+        "  cvt.rni.sat.s16.f32 t16, %1;"
+        "  mov.b16 %0, t16;"
+        "}"
+        : "=h"(sat_s16_bits) : "f"(v)); // 16-bit SAT through a real 16-bit PTX reg
+    out[i*3+2]=(int)(short)sat_s16_bits;
 }

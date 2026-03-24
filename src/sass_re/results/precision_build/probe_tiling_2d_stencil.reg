@@ -1,0 +1,26 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_tile_3d_async' for 'sm_89'
+ptxas info    : Function properties for probe_tile_3d_async
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers, used 1 barriers, 800 bytes smem, 380 bytes cmem[0]
+ptxas info    : Compile time = 6.880 ms
+ptxas info    : Compiling entry function 'probe_tile_3d_8x8x4' for 'sm_89'
+ptxas info    : Function properties for probe_tile_3d_8x8x4
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 1 barriers, 2400 bytes smem, 380 bytes cmem[0]
+ptxas info    : Compile time = 6.283 ms
+ptxas info    : Compiling entry function 'probe_tile_25pt_r2' for 'sm_89'
+ptxas info    : Function properties for probe_tile_25pt_r2
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 1 barriers, 1600 bytes smem, 376 bytes cmem[0]
+ptxas info    : Compile time = 6.590 ms
+ptxas info    : Compiling entry function 'probe_tile_9pt_r1' for 'sm_89'
+ptxas info    : Function properties for probe_tile_9pt_r1
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers, used 1 barriers, 1296 bytes smem, 376 bytes cmem[0]
+ptxas info    : Compile time = 2.431 ms
+ptxas info    : Compiling entry function 'probe_tile_5pt_r1' for 'sm_89'
+ptxas info    : Function properties for probe_tile_5pt_r1
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 19 registers, used 1 barriers, 1296 bytes smem, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.850 ms

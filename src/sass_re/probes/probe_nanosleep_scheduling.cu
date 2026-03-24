@@ -24,7 +24,7 @@
 #define N 512
 
 /* ── NANOSLEEP at various timer values ──────────────── */
-__global__ void __launch_bounds__(32)
+extern "C" __global__ void __launch_bounds__(32)
 k_nanosleep_0(volatile int *sink, volatile long long *out) {
     long long t0, t1;
     asm volatile("mov.u64 %0, %%clock64;" : "=l"(t0));
@@ -36,7 +36,7 @@ k_nanosleep_0(volatile int *sink, volatile long long *out) {
     if (threadIdx.x == 0) { out[0] = t1 - t0; out[1] = N; }
 }
 
-__global__ void __launch_bounds__(32)
+extern "C" __global__ void __launch_bounds__(32)
 k_nanosleep_100(volatile int *sink, volatile long long *out) {
     long long t0, t1;
     asm volatile("mov.u64 %0, %%clock64;" : "=l"(t0));
@@ -48,7 +48,7 @@ k_nanosleep_100(volatile int *sink, volatile long long *out) {
     if (threadIdx.x == 0) { out[0] = t1 - t0; out[1] = N; }
 }
 
-__global__ void __launch_bounds__(32)
+extern "C" __global__ void __launch_bounds__(32)
 k_nanosleep_1000(volatile int *sink, volatile long long *out) {
     long long t0, t1;
     asm volatile("mov.u64 %0, %%clock64;" : "=l"(t0));
@@ -61,7 +61,7 @@ k_nanosleep_1000(volatile int *sink, volatile long long *out) {
 }
 
 /* ── Warp-level FLOAT reduction (SHFL, since REDUX.FADD doesn't exist) ── */
-__global__ void __launch_bounds__(32)
+extern "C" __global__ void __launch_bounds__(32)
 k_float_reduce_shfl(volatile float *sink, volatile long long *out) {
     float x = (float)threadIdx.x + sink[0];
     long long t0, t1;
@@ -84,7 +84,7 @@ k_float_reduce_shfl(volatile float *sink, volatile long long *out) {
 }
 
 /* ── Warp-level INT reduction: REDUX.SUM vs SHFL comparison ── */
-__global__ void __launch_bounds__(32)
+extern "C" __global__ void __launch_bounds__(32)
 k_int_reduce_redux(volatile int *sink, volatile long long *out) {
     int x = threadIdx.x + sink[0];
     long long t0, t1;
@@ -100,7 +100,7 @@ k_int_reduce_redux(volatile int *sink, volatile long long *out) {
     }
 }
 
-__global__ void __launch_bounds__(32)
+extern "C" __global__ void __launch_bounds__(32)
 k_int_reduce_shfl(volatile int *sink, volatile long long *out) {
     int x = threadIdx.x + sink[0];
     long long t0, t1;
@@ -146,6 +146,7 @@ static double measure_fp(void (*k)(volatile float*, volatile long long*),
     return tot / R;
 }
 
+#ifndef SASS_RE_EMBEDDED_RUNNER
 int main() {
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
@@ -185,3 +186,4 @@ int main() {
     cudaFree(d_out); cudaFree(d_iv); cudaFree(d_fv);
     return 0;
 }
+#endif

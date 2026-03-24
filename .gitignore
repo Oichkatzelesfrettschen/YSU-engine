@@ -38,3 +38,10 @@ Thumbs.db
 temp_*/
 *.bak
 *.orig
+
+# Generated SASS RE sweep artifacts
+src/sass_re/results/runs/
+src/sass_re/results/plan_impl_*/
+src/sass_re/results/ncu_full_*/
+src/sass_re/results/flag_sweep/
+src/sass_re/results/full_profile/

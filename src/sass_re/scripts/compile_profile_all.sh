@@ -1,21 +1,26 @@
 #!/bin/sh
-# Compile all probes with maximum flags, disassemble, extract stats to CSV,
-# then run ncu on latency benchmarks.
+# Compile the recursive probe corpus with a high-signal profiling lane,
+# disassemble every successful build, and extract per-probe stats.
 #
-# Flags: -arch=sm_89 -O3 -Xptxas -O3,-warn-double-usage,-warn-spills
-#        --use_fast_math --extra-device-vectorization --restrict
-#        --default-stream per-thread -std=c++20 -lineinfo
-#
-# Output: CSV with per-kernel stats + disassembled SASS + ncu metrics
+# Output:
+#   - mirrored .cubin/.sass/.reg artifacts
+#   - per-probe CSV rows keyed by probe_id and relative path
+#   - combined mnemonic inventory
 
 set -eu
 
-PROBEDIR="$(cd "$(dirname "$0")/../probes" && pwd)"
-BENCHDIR="$(cd "$(dirname "$0")/../microbench" && pwd)"
-OUTDIR="${1:-$(dirname "$0")/../results/full_profile_$(date +%Y%m%d_%H%M%S)}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+NVCC="${NVCC:-nvcc}"
+NVCC_STD_FLAG="$("$SCRIPT_DIR/resolve_nvcc_std_flag.sh" "$NVCC")"
+BENCHDIR="$(cd "$SCRIPT_DIR/../microbench" && pwd)"
+PROBEDIR="$(cd "$SCRIPT_DIR/../probes" && pwd)"
+MANIFEST_PY="$SCRIPT_DIR/probe_manifest.py"
+OUTDIR="${1:-$SCRIPT_DIR/../results/runs/full_profile_$(date +%Y%m%d_%H%M%S)}"
 mkdir -p "$OUTDIR"
 
-FLAGS="-arch=sm_89 -O3 -Xptxas -O3,-warn-double-usage,-warn-spills --use_fast_math --extra-device-vectorization --restrict --default-stream per-thread -std=c++20 -lineinfo"
+FLAGS="-arch=sm_89 -O3 -Xptxas -O3,-warn-double-usage,-warn-spills --use_fast_math --extra-device-vectorization --restrict --default-stream per-thread $NVCC_STD_FLAG -lineinfo"
+MANIFEST_TSV="$OUTDIR/probe_manifest.tsv"
+python3 "$MANIFEST_PY" emit --format tsv > "$MANIFEST_TSV"
 
 echo "=== Full Compile + Profile Pipeline ===" | tee "$OUTDIR/pipeline.log"
 echo "Flags: $FLAGS" | tee -a "$OUTDIR/pipeline.log"
@@ -24,25 +29,23 @@ echo "" | tee -a "$OUTDIR/pipeline.log"
 
 # CSV header
 CSV="$OUTDIR/probe_stats.csv"
-echo "probe,compiled,sass_lines,unique_mnemonics,max_registers,spill_stores,spill_loads,new_mnemonics" > "$CSV"
-
-# Baseline mnemonics (from previous sweep)
-BASELINE="$OUTDIR/baseline_mnemonics.txt"
+echo "probe_id,relative_path,compiled,sass_lines,unique_mnemonics,max_registers,spill_stores,spill_loads,status" > "$CSV"
 
 # Phase 1: Compile + disassemble all probes
 echo "=== Phase 1: Compile + Disassemble ===" | tee -a "$OUTDIR/pipeline.log"
 PASS=0 FAIL=0
 ALL_MNEMONICS=""
 
-for f in "$PROBEDIR"/probe_*.cu; do
-    name=$(basename "$f" .cu)
-    [ "$name" = "probe_optix_host_pipeline" ] && continue
+while IFS="$(printf '\t')" read -r probe_id rel_path basename compile_enabled runner_kind supports_generic_runner kernel_names skip_reason; do
+    [ "$compile_enabled" = "1" ] || continue
+    src="$SCRIPT_DIR/../probes/$rel_path"
+    rel_base=${rel_path%.cu}
+    cubin="$OUTDIR/$rel_base.cubin"
+    sass="$OUTDIR/$rel_base.sass"
+    reglog="$OUTDIR/$rel_base.reg"
+    mkdir -p "$(dirname "$cubin")"
 
-    cubin="$OUTDIR/${name}.cubin"
-    sass="$OUTDIR/${name}.sass"
-    reglog="$OUTDIR/${name}.reg"
-
-    if nvcc $FLAGS -Xptxas -v -cubin "$f" -o "$cubin" 2>"$reglog"; then
+    if $NVCC $FLAGS -Xptxas -v -cubin "$src" -o "$cubin" 2>"$reglog"; then
         cuobjdump -sass "$cubin" > "$sass" 2>/dev/null
         lines=$(grep -c '^\s\+/\*[0-9a-f]' "$sass" 2>/dev/null || echo 0)
         unique=$(grep -oP '^\s+/\*[0-9a-f]+\*/\s+\K[A-Z][A-Z0-9_.]+' "$sass" 2>/dev/null | sort -u | wc -l)
@@ -53,18 +56,18 @@ for f in "$PROBEDIR"/probe_*.cu; do
         [ -z "$spill_st" ] && spill_st=0
         [ -z "$spill_ld" ] && spill_ld=0
 
-        echo "$name,1,$lines,$unique,$regs,$spill_st,$spill_ld," >> "$CSV"
+        echo "$probe_id,$rel_path,1,$lines,$unique,$regs,$spill_st,$spill_ld,OK" >> "$CSV"
         PASS=$((PASS+1))
     else
-        echo "$name,0,0,0,0,0,0,COMPILE_FAIL" >> "$CSV"
+        echo "$probe_id,$rel_path,0,0,0,0,0,0,COMPILE_FAIL" >> "$CSV"
         FAIL=$((FAIL+1))
     fi
-done
+done < "$MANIFEST_TSV"
 
 echo "Compiled: $PASS  Failed: $FAIL" | tee -a "$OUTDIR/pipeline.log"
 
 # Extract combined mnemonics
-for f in "$OUTDIR"/*.sass; do
+find "$OUTDIR" -type f -name '*.sass' | while IFS= read -r f; do
     grep -oP '^\s+/\*[0-9a-f]+\*/\s+\K[A-Z][A-Z0-9_.]+' "$f" 2>/dev/null
 done | sort -u > "$OUTDIR/all_mnemonics.txt"
 TOTAL_MNEM=$(wc -l < "$OUTDIR/all_mnemonics.txt")
@@ -83,7 +86,7 @@ for bench in microbench_latency microbench_latency_expanded microbench_latency_w
     bin="$OUTDIR/${bench}"
 
     echo "  Building $bench..." | tee -a "$OUTDIR/pipeline.log"
-    if nvcc $FLAGS -I"$PROBEDIR" -o "$bin" "$src" 2>"$OUTDIR/${bench}_compile.log"; then
+    if $NVCC $FLAGS -I"$PROBEDIR" -o "$bin" "$src" 2>"$OUTDIR/${bench}_compile.log"; then
         echo "  Running $bench..." | tee -a "$OUTDIR/pipeline.log"
         "$bin" > "$OUTDIR/${bench}_output.txt" 2>&1 || true
         # Extract latency lines to CSV

@@ -1,0 +1,5 @@
+Patch path / class,Current result
+ULOP3 -> UPLOP3,structurally invalid
+PLOP3 -> UPLOP3,structurally valid
+Local runtime classes,inert and stable-but-different
+Direct local source/IR emission of UPLOP3.LUT,not reproduced
