@@ -43,6 +43,17 @@ def generate_inventory_numeric() -> pathlib.Path:
     return out
 
 
+def generate_inventory_plot() -> pathlib.Path:
+    rows = [
+        ["canonical_frontier", 379],
+        ["discovery_lane", 382],
+        ["catalog_rows", 470],
+    ]
+    out = OUT / "inventory_plot.csv"
+    write_csv(out, ["metric_key", "count"], rows)
+    return out
+
+
 def generate_p2r_status_numeric() -> pathlib.Path:
     src = TABLES / "table_a2_p2r_frontier_status.csv"
     score_map = {
@@ -60,6 +71,20 @@ def generate_p2r_status_numeric() -> pathlib.Path:
             rows.append([row["Axis"], result, score_map.get(result, "")])
     out = OUT / "p2r_frontier_numeric.csv"
     write_csv(out, ["axis", "status", "score"], rows)
+    return out
+
+
+def generate_p2r_status_plot() -> pathlib.Path:
+    rows = [
+        ["source_ir_bstar", 0],
+        ["plain_p2r_0x7f", 1],
+        ["plain_p2r_0x0f", 1],
+        ["frontend_sweeps", 0],
+        ["cubin_bstar", 2],
+        ["interpretation", 1],
+    ]
+    out = OUT / "p2r_frontier_plot.csv"
+    write_csv(out, ["axis_key", "score"], rows)
     return out
 
 
@@ -91,6 +116,12 @@ def generate_runtime_class_counts() -> pathlib.Path:
     return out_counts
 
 
+def generate_runtime_class_plot() -> pathlib.Path:
+    out = OUT / "uplop3_runtime_class_plot.csv"
+    write_csv(out, ["class_key", "count"], [["inert", 12], ["stablediff", 3]])
+    return out
+
+
 def generate_live_site_numeric() -> pathlib.Path:
     src = TABLES / "table_a4_live_uplop3_site_ranking.csv"
     rows: list[list[object]] = []
@@ -101,6 +132,20 @@ def generate_live_site_numeric() -> pathlib.Path:
             rows.append([row["Rank"], row["Site"], row["Current role"], row["Best jaccard"], f"{1.0-j:.6f}"])
     out = OUT / "uplop3_live_site_numeric.csv"
     write_csv(out, ["rank", "site", "role", "best_jaccard", "distance_to_1"], rows)
+    return out
+
+
+def generate_live_site_plot() -> pathlib.Path:
+    rows = [
+        ["u1", 0.375000],
+        ["c5", 0.375000],
+        ["u2", 0.300000],
+        ["c4", 0.333333],
+        ["u5", 0.300000],
+        ["co1", 0.300000],
+    ]
+    out = OUT / "uplop3_live_site_plot.csv"
+    write_csv(out, ["site_key", "best_jaccard"], rows)
     return out
 
 
@@ -122,6 +167,20 @@ def generate_pair_baseline_numeric() -> pathlib.Path:
         rows.append([current_family, match.group(1), same, diff, total, f"{diff_ratio:.6f}"])
     out = OUT / "uplop3_pair_baseline_numeric.csv"
     write_csv(out, ["family", "variant", "same", "diff", "total", "diff_ratio"], rows)
+    return out
+
+
+def generate_pair_baseline_plot() -> pathlib.Path:
+    rows = [
+        ["u_occ1", 0.708333],
+        ["u_occ1_occ5", 0.708333],
+        ["u_occ1_occ2_occ5", 0.458333],
+        ["c_occ4", 1.000000],
+        ["c_occ4_occ5", 0.666667],
+        ["c_occ2_occ4_occ5", 0.625000],
+    ]
+    out = OUT / "uplop3_pair_baseline_plot.csv"
+    write_csv(out, ["variant_key", "diff_ratio"], rows)
     return out
 
 
@@ -148,10 +207,15 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     outputs = [
         generate_inventory_numeric(),
+        generate_inventory_plot(),
         generate_p2r_status_numeric(),
+        generate_p2r_status_plot(),
         generate_runtime_class_counts(),
+        generate_runtime_class_plot(),
         generate_live_site_numeric(),
+        generate_live_site_plot(),
         generate_pair_baseline_numeric(),
+        generate_pair_baseline_plot(),
         generate_tool_effectiveness_numeric(),
     ]
     print("generated_monograph_assets")

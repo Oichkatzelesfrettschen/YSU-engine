@@ -21,6 +21,7 @@ Current standalone Ada-only manuscript fragment:
 Current monograph-level synthesis and LaTeX/PGFPlots package:
 [MONOGRAPH_SM89_SYNTHESIS.md](/home/eirikr/Github/YSU-engine/src/sass_re/MONOGRAPH_SM89_SYNTHESIS.md)
 [sm89_monograph.tex](/home/eirikr/Github/YSU-engine/src/sass_re/tex/sm89_monograph.tex)
+[sm89_monograph.pdf](/home/eirikr/Github/YSU-engine/src/sass_re/tex/build/sm89_monograph.pdf)
 
 Current section coverage map:
 [PAPER_SECTION_COVERAGE.md](/home/eirikr/Github/YSU-engine/src/sass_re/PAPER_SECTION_COVERAGE.md)

@@ -11,6 +11,9 @@ Monograph-level synthesis and plot-ready archive:
 
 - [MONOGRAPH_SM89_SYNTHESIS.md](/home/eirikr/Github/YSU-engine/src/sass_re/MONOGRAPH_SM89_SYNTHESIS.md)
 - [sm89_monograph.tex](/home/eirikr/Github/YSU-engine/src/sass_re/tex/sm89_monograph.tex)
+- [build_monograph_pdf.sh](/home/eirikr/Github/YSU-engine/src/sass_re/scripts/build_monograph_pdf.sh)
+- [verify_monograph_pdf.py](/home/eirikr/Github/YSU-engine/src/sass_re/scripts/verify_monograph_pdf.py)
+- [sm89_monograph.pdf](/home/eirikr/Github/YSU-engine/src/sass_re/tex/build/sm89_monograph.pdf)
 - [processed/monograph_20260323/README.md](/home/eirikr/Github/YSU-engine/src/sass_re/processed/monograph_20260323/README.md)
 
 ## Table A1. SM89 Inventory Summary

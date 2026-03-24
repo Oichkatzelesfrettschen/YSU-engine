@@ -13,13 +13,26 @@ PROCESSED = ROOT / "processed/monograph_20260323"
 REQUIRED_FILES = [
     MONOGRAPH_MD,
     MONOGRAPH_TEX,
+    ROOT / "MONOGRAPH_GLOSSARY.md",
+    ROOT / "EXPERIMENTS_PORTFOLIO_SHORTLIST.md",
+    ROOT / "EXPERIMENTS_PAPER_PLAN.md",
+    ROOT / "tex/fig_inventory_closure.tex",
+    ROOT / "tex/fig_p2r_frontier.tex",
+    ROOT / "tex/fig_uplop3_runtime.tex",
+    ROOT / "tex/fig_pair_baseline.tex",
     PROCESSED / "inventory_numeric.csv",
+    PROCESSED / "inventory_plot.csv",
     PROCESSED / "p2r_frontier_numeric.csv",
+    PROCESSED / "p2r_frontier_plot.csv",
     PROCESSED / "uplop3_runtime_class_counts.csv",
+    PROCESSED / "uplop3_runtime_class_plot.csv",
     PROCESSED / "uplop3_runtime_sites.csv",
     PROCESSED / "uplop3_live_site_numeric.csv",
+    PROCESSED / "uplop3_live_site_plot.csv",
     PROCESSED / "uplop3_pair_baseline_numeric.csv",
+    PROCESSED / "uplop3_pair_baseline_plot.csv",
     PROCESSED / "tool_effectiveness_numeric.csv",
+    PROCESSED / "SHA256SUMS",
 ]
 
 REQUIRED_HEADINGS = [
@@ -49,13 +62,31 @@ def main() -> int:
         tex = MONOGRAPH_TEX.read_text(encoding="utf-8")
         for needle in [
             "\\begin{document}",
-            "\\begin{tikzpicture}",
-            "inventory_numeric.csv",
-            "p2r_frontier_numeric.csv",
-            "uplop3_runtime_class_counts.csv",
+            "\\input{fig_inventory_closure.tex}",
+            "\\input{fig_p2r_frontier.tex}",
+            "\\input{fig_uplop3_runtime.tex}",
+            "\\input{fig_pair_baseline.tex}",
         ]:
             if needle not in tex:
                 errors.append(f"tex missing token: {needle}")
+
+    figure_expectations = {
+        ROOT / "tex/fig_inventory_closure.tex": ["inventory_plot.csv", "\\begin{axis}"],
+        ROOT / "tex/fig_p2r_frontier.tex": ["p2r_frontier_plot.csv", "\\begin{axis}"],
+        ROOT / "tex/fig_uplop3_runtime.tex": [
+            "uplop3_runtime_class_plot.csv",
+            "uplop3_live_site_plot.csv",
+            "\\begin{groupplot}",
+        ],
+        ROOT / "tex/fig_pair_baseline.tex": ["uplop3_pair_baseline_plot.csv", "\\begin{axis}"],
+    }
+    for path, needles in figure_expectations.items():
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for needle in needles:
+            if needle not in text:
+                errors.append(f"figure missing token: {path.name}: {needle}")
 
     if errors:
         for err in errors:
