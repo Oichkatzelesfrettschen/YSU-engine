@@ -3,7 +3,16 @@
  * Launches key kernels that produced new SASS mnemonics.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <cuda_runtime.h>
+
+#define CHECK(call) do { \
+    cudaError_t e = (call); \
+    if (e != cudaSuccess) { \
+        fprintf(stderr, "CUDA %s:%d: %s\n", __FILE__, __LINE__, \
+                cudaGetErrorString(e)); exit(1); \
+    } \
+} while(0)
 
 // Include probes that produced new mnemonics
 #include "probe_int8_tile_dp4a_stencil.cu"
@@ -23,10 +32,10 @@ int main() {
     printf("=== INT+Bitops Probe Runner ===\n");
     int N = 1024*1024;
     void *d_a, *d_b, *d_c, *d_d;
-    cudaMalloc(&d_a, N*8); cudaMalloc(&d_b, N*8);
-    cudaMalloc(&d_c, N*8); cudaMalloc(&d_d, N*8);
-    cudaMemset(d_a, 1, N*8); cudaMemset(d_b, 2, N*8);
-    cudaMemset(d_c, 0, N*8);
+    CHECK(cudaMalloc(&d_a, N*8)); CHECK(cudaMalloc(&d_b, N*8));
+    CHECK(cudaMalloc(&d_c, N*8)); CHECK(cudaMalloc(&d_d, N*8));
+    CHECK(cudaMemset(d_a, 1, N*8)); CHECK(cudaMemset(d_b, 2, N*8));
+    CHECK(cudaMemset(d_c, 0, N*8));
 
     int blocks = (N+127)/128;
     dim3 g2d((1024+15)/16, (1024+15)/16);
@@ -53,7 +62,7 @@ int main() {
     int32_bitonic_warp<<<N/32, 32>>>((int*)d_a, N);
 
     // INT32 compact
-    int cnt = 0; int *d_cnt; cudaMalloc(&d_cnt, 4); cudaMemset(d_cnt, 0, 4);
+    int cnt = 0; int *d_cnt; CHECK(cudaMalloc(&d_cnt, 4)); CHECK(cudaMemset(d_cnt, 0, 4));
     int32_compact<<<blocks, 128>>>((int*)d_c, d_cnt, (const int*)d_a, 50, N);
 
     // BREV FFT permute
@@ -63,13 +72,13 @@ int main() {
     popc_hamming<<<blocks, 128>>>((int*)d_c, (const unsigned*)d_a, (const unsigned*)d_b, N);
 
     // IABS L1 norm
-    cudaMemset(d_c, 0, 4);
+    CHECK(cudaMemset(d_c, 0, 4));
     iabs_l1norm<<<blocks, 128>>>((int*)d_c, (const int*)d_a, N);
 
     // CLZ log2
     clz_log2<<<blocks, 128>>>((int*)d_c, (const unsigned*)d_a, N);
 
-    cudaDeviceSynchronize();
+    CHECK(cudaDeviceSynchronize());
     printf("All kernels launched OK\n");
 
     cudaFree(d_a); cudaFree(d_b); cudaFree(d_c); cudaFree(d_d); cudaFree(d_cnt);

@@ -11,6 +11,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 #include <cuda_bf16.h>
@@ -129,12 +130,12 @@ int main() {
            prop.major, prop.minor, prop.name, n_sms, clk/1000);
 
     // Allocate sinks
-    unsigned *d_u; cudaMalloc(&d_u, 1024*4);
-    int *d_i; cudaMalloc(&d_i, 1024*4);
-    double *d_d; cudaMalloc(&d_d, 1024*8);
+    unsigned *d_u; CHECK(cudaMalloc(&d_u, 1024*4));
+    int *d_i; CHECK(cudaMalloc(&d_i, 1024*4));
+    double *d_d; CHECK(cudaMalloc(&d_d, 1024*8));
 
     cudaEvent_t start, stop;
-    cudaEventCreate(&start); cudaEventCreate(&stop);
+    CHECK(cudaEventCreate(&start)); CHECK(cudaEventCreate(&stop));
 
     printf("%-20s %14s %14s\n", "Instruction", "ops/clk/SM", "peak theor.");
     printf("%-20s %14s %14s\n", "--------------------", "--------------", "--------------");

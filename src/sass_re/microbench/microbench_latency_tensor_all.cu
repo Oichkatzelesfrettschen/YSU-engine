@@ -185,16 +185,17 @@ k_tc_uint4_i32(int *d_D, const void *d_A, const void *d_B,
 
 /* ================================================================ */
 
-static double measure_tc(void *kernel, void *d_D, const void *d_A,
+static double measure_tc(const void *kernel, void *d_D, const void *d_A,
                          const void *d_B, long long *d_t, long long *h) {
     // Generic launcher for all TC kernels (same signature pattern)
     // Each kernel is launched, warmed up, then measured 10x
-    typedef void (*tc_kernel_t)(void*, const void*, const void*, volatile long long*);
-    tc_kernel_t k = (tc_kernel_t)kernel;
-    k<<<1,32>>>(d_D, d_A, d_B, d_t); cudaDeviceSynchronize();
+    void *args[] = { &d_D, &d_A, &d_B, &d_t };
+    cudaLaunchKernel(kernel, dim3(1), dim3(32), args, 0, 0);
+    cudaDeviceSynchronize();
     double tot = 0;
     for (int r = 0; r < 10; r++) {
-        k<<<1,32>>>(d_D, d_A, d_B, d_t); cudaDeviceSynchronize();
+        cudaLaunchKernel(kernel, dim3(1), dim3(32), args, 0, 0);
+        cudaDeviceSynchronize();
         cudaMemcpy(h, d_t, 16, cudaMemcpyDeviceToHost);
         tot += (double)h[0] / (double)h[1];
     }

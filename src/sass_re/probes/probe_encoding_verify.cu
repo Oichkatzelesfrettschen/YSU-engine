@@ -50,10 +50,12 @@ probe_enc_dest_regs(float *out) {
     asm volatile("add.f32 %0, %1, %2;" : "=f"(r15) : "f"(a), "f"(b));
 
     // Store all to prevent DCE (compiler must keep all register assignments)
-    out[0]  = r0;  out[1]  = r1;  out[2]  = r2;  out[3]  = r3;
-    out[4]  = r4;  out[5]  = r5;  out[6]  = r6;  out[7]  = r7;
-    out[8]  = r8;  out[9]  = r9;  out[10] = r10; out[11] = r11;
-    out[12] = r12; out[13] = r13; out[14] = r14; out[15] = r15;
+    if (threadIdx.x == 0) {
+        out[0]  = r0;  out[1]  = r1;  out[2]  = r2;  out[3]  = r3;
+        out[4]  = r4;  out[5]  = r5;  out[6]  = r6;  out[7]  = r7;
+        out[8]  = r8;  out[9]  = r9;  out[10] = r10; out[11] = r11;
+        out[12] = r12; out[13] = r13; out[14] = r14; out[15] = r15;
+    }
 }
 
 /* ── LOP3 LUT value sweep (0x00-0xFF) ────────────── */
@@ -80,8 +82,10 @@ probe_enc_lop3_lut(unsigned *out, const unsigned *in) {
     // LUT 0x00 = zero
     asm volatile("lop3.b32 %0, %1, %2, %3, 0x00;" : "=r"(r_oab) : "r"(a), "r"(b), "r"(c));
 
-    out[0] = r_and; out[1] = r_or; out[2] = r_xor; out[3] = r_nand;
-    out[4] = r_xnor; out[5] = r_oab; out[6] = r_mux; out[7] = r_maj;
+    if (threadIdx.x == 0) {
+        out[0] = r_and; out[1] = r_or; out[2] = r_xor; out[3] = r_nand;
+        out[4] = r_xnor; out[5] = r_oab; out[6] = r_mux; out[7] = r_maj;
+    }
 }
 
 /* ── Predicate guard sweep (via C conditionals -> FSETP + @Pn FADD) ── */
@@ -118,7 +122,9 @@ probe_enc_rounding(float *out, const float *in) {
     // Round toward -inf (.rm)
     asm volatile("fma.rm.f32 %0, %1, %2, %3;" : "=f"(rm) : "f"(a), "f"(b), "f"(c));
 
-    out[0] = rn; out[1] = rz; out[2] = rp; out[3] = rm;
+    if (threadIdx.x == 0) {
+        out[0] = rn; out[1] = rz; out[2] = rp; out[3] = rm;
+    }
 }
 
 /* ── Immediate width sweep ────────────────────────── */

@@ -43,7 +43,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    known = load_known(pathlib.Path(args.known))
+    known_path = pathlib.Path(args.known)
+    if not known_path.exists():
+        print(f"error: census file not found: {known_path}", file=sys.stderr)
+        return 1
+
+    known = load_known(known_path)
     emitted = load_emitted([pathlib.Path(item) for item in args.mnemonic_files])
     novel = sorted(emitted - known)
     for item in novel:
