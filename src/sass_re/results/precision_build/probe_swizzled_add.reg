@@ -1,0 +1,22 @@
+probes/probe_swizzled_add.cu(45): warning #177-D: variable "partner" was declared but never referenced
+      float partner;
+            ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_float_vs_int_reduce' for 'sm_89'
+ptxas info    : Function properties for probe_float_vs_int_reduce
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 2.157 ms
+ptxas info    : Compiling entry function 'probe_fswzadd_explicit' for 'sm_89'
+ptxas info    : Function properties for probe_fswzadd_explicit
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.092 ms
+ptxas info    : Compiling entry function 'probe_fswzadd_butterfly' for 'sm_89'
+ptxas info    : Function properties for probe_fswzadd_butterfly
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.214 ms

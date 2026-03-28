@@ -1,0 +1,31 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_int64_atomic' for 'sm_89'
+ptxas info    : Function properties for probe_int64_atomic
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 364 bytes cmem[0]
+ptxas info    : Compile time = 3.768 ms
+ptxas info    : Compiling entry function 'probe_umul64hi' for 'sm_89'
+ptxas info    : Function properties for probe_umul64hi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 16 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 0.775 ms
+ptxas info    : Compiling entry function 'probe_int64_compare' for 'sm_89'
+ptxas info    : Function properties for probe_int64_compare
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 1.019 ms
+ptxas info    : Compiling entry function 'probe_int64_shift' for 'sm_89'
+ptxas info    : Function properties for probe_int64_shift
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.815 ms
+ptxas info    : Compiling entry function 'probe_int64_mul' for 'sm_89'
+ptxas info    : Function properties for probe_int64_mul
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 0.616 ms
+ptxas info    : Compiling entry function 'probe_int64_add' for 'sm_89'
+ptxas info    : Function properties for probe_int64_add
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.491 ms

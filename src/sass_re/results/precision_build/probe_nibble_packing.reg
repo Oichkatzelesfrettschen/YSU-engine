@@ -1,0 +1,26 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_prmt_permute' for 'sm_89'
+ptxas info    : Function properties for probe_prmt_permute
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 16 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.380 ms
+ptxas info    : Compiling entry function 'probe_nibble_bulk_unpack' for 'sm_89'
+ptxas info    : Function properties for probe_nibble_bulk_unpack
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 53 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 24.813 ms
+ptxas info    : Compiling entry function 'probe_fp4_decode' for 'sm_89'
+ptxas info    : Function properties for probe_fp4_decode
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 1 barriers, 64 bytes smem, 368 bytes cmem[0]
+ptxas info    : Compile time = 1.393 ms
+ptxas info    : Compiling entry function 'probe_nibble_pack' for 'sm_89'
+ptxas info    : Function properties for probe_nibble_pack
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 0.633 ms
+ptxas info    : Compiling entry function 'probe_nibble_extract' for 'sm_89'
+ptxas info    : Function properties for probe_nibble_extract
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 0.693 ms

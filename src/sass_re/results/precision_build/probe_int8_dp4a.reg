@@ -1,0 +1,21 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_dp4a_momentum' for 'sm_89'
+ptxas info    : Function properties for probe_dp4a_momentum
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 2.082 ms
+ptxas info    : Compiling entry function 'probe_dp4a_throughput' for 'sm_89'
+ptxas info    : Function properties for probe_dp4a_throughput
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 18 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.310 ms
+ptxas info    : Compiling entry function 'probe_dp4a_chain' for 'sm_89'
+ptxas info    : Function properties for probe_dp4a_chain
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 0.998 ms
+ptxas info    : Compiling entry function 'probe_dp4a' for 'sm_89'
+ptxas info    : Function properties for probe_dp4a
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 0.506 ms
