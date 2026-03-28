@@ -59,3 +59,14 @@ src/sass_re/results/precision_build/benchmarks/microbench_*
 *.ncu-rep
 *.nsys-rep
 *.sqlite
+
+# LaTeX build artifacts (PDF is a release artifact, not tracked)
+*.aux
+*.log
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+src/sass_re/tex/build/
+src/sass_re/tex/test_*
