@@ -1,0 +1,21 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function 'probe_reg_extreme' for 'sm_89'
+ptxas info    : Function properties for probe_reg_extreme
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 3.760 ms
+ptxas info    : Compiling entry function 'probe_reg_high' for 'sm_89'
+ptxas info    : Function properties for probe_reg_high
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 7.464 ms
+ptxas info    : Compiling entry function 'probe_reg_medium' for 'sm_89'
+ptxas info    : Function properties for probe_reg_medium
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 2.025 ms
+ptxas info    : Compiling entry function 'probe_reg_low' for 'sm_89'
+ptxas info    : Function properties for probe_reg_low
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 0.505 ms
