@@ -1,0 +1,5 @@
+Tool,Current role,Why it matters,Caveat
+Differential fuzzing,primary semantic discriminator,"separates anchors, sensitizers, amplifiers, and broadeners",not a safety tool
+compute-sanitizer,safety gate,shows live cubins are not merely obvious invalid memory behavior,perturbs aggregate sums
+ncu,perf sanity check,helps rule out hidden perf-regime shifts,weak semantic discriminator
+nsys,trace sidecar,preserves timelines and host/driver context for later analysis,lower immediate yield than fuzzing/sanitizer

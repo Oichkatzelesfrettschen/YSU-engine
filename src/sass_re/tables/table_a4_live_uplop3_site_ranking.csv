@@ -1,0 +1,7 @@
+Rank,Site,Current role,Best jaccard
+1,uniform_occ1,anchor,0.375000
+2,cutlass_occ5,anchor,0.375000
+3,uniform_occ2,secondary anchor,0.300000
+4,cutlass_occ4,amplifier,0.333333
+5,uniform_occ5,sensitizer,0.300000
+6,cooperative_occ1,lower-priority live site,0.300000
