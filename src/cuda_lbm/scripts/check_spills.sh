@@ -45,19 +45,25 @@ awk '
 /Compiling entry function/ {
     match($0, /\047([^\047]+)\047/, arr)
     current_fn = arr[1]
+    spill_stores[current_fn] = 0
+    spill_loads[current_fn] = 0
+}
+/spill stores/ {
+    if (match($0, /([0-9]+) bytes spill stores/, arr))
+        spill_stores[current_fn] = arr[1]
+}
+/spill loads/ {
+    if (match($0, /([0-9]+) bytes spill loads/, arr))
+        spill_loads[current_fn] = arr[1]
 }
 /Used [0-9]+ registers/ {
-    regs = 0; smem = 0; lmem = 0; spills = ""
+    regs = 0; smem = 0; lmem = 0
     match($0, /Used ([0-9]+) registers/, arr)
     regs = arr[1]
     if (match($0, /([0-9]+) bytes smem/, arr)) smem = arr[1]
     if (match($0, /([0-9]+) bytes lmem/, arr)) lmem = arr[1]
-    printf "%-50s  %5d  %8d  %8d\n", current_fn, regs, smem, lmem
-}
-/spill (stores|loads)/ {
-    match($0, /([0-9]+) bytes spill stores/, ss)
-    match($0, /([0-9]+) bytes spill loads/, sl)
-    printf "  -> spill stores: %s, spill loads: %s\n", ss[1], sl[1]
+    spill_total = spill_stores[current_fn] + spill_loads[current_fn]
+    printf "%-50s  %5d  %8d  %8d  %8d\n", current_fn, regs, smem, lmem, spill_total
 }
 ' "$LOG"
 
