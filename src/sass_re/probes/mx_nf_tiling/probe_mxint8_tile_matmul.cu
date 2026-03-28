@@ -9,10 +9,11 @@ mxint8_tile_dot(float *out, const signed char *a_elems, const float *a_scales,
     if(i>=n_dots)return;
     
     float acc=0.0f;
+    int k_blocks=(K+31)/32;
     for(int k=0;k<K;k++){
         int a_block=k/32, b_block=k/32;
-        float a_scale=a_scales[i*(K/32)+a_block];
-        float b_scale=b_scales[i*(K/32)+b_block];
+        float a_scale=a_scales[i*k_blocks+a_block];
+        float b_scale=b_scales[i*k_blocks+b_block];
         float a_val=(float)a_elems[i*K+k]*a_scale;
         float b_val=(float)b_elems[i*K+k]*b_scale;
         acc+=a_val*b_val;

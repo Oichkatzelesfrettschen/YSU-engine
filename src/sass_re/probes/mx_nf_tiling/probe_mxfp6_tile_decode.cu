@@ -7,7 +7,11 @@
 // has NO hardware support on any current GPU (Blackwell SM 10.0 only).
 
 // E3M2 decode table (64 entries)
-__constant__ float FP6_E3M2_LUT[64]; // Would contain the 64 E3M2 values
+// SASS RE probe -- LUT is intentionally uninitialized here because the
+// probe's purpose is to observe SASS instruction patterns (LDC, binary
+// search structure), not to produce numerically correct output.  The LUT
+// would be populated via cudaMemcpyToSymbol at runtime.
+__constant__ float FP6_E3M2_LUT[64];
 
 extern "C" __global__ void __launch_bounds__(128)
 mxfp6_tile_decode(float *out, const unsigned char *packed_3bytes,

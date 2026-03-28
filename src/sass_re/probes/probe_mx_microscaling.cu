@@ -25,11 +25,9 @@
 // E8M0 shared scale factor: 8-bit unsigned exponent, bias=127
 // Value = 2^(e - 127), where e is the stored byte value
 __device__ __forceinline__ float e8m0_to_float(unsigned char e8m0) {
-    // Construct FP32 from exponent: set exponent field, zero mantissa
-    unsigned int bits = ((unsigned int)e8m0) << 23;
-    float result;
-    memcpy(&result, &bits, sizeof(result));
-    return result;
+    // ldexpf(1.0f, e8m0 - 127) handles e8m0==0 correctly (returns 2^-127),
+    // whereas the bit-shift approach would produce 0.0f for e8m0==0.
+    return ldexpf(1.0f, (int)e8m0 - 127);
 }
 
 // ── MXFP8 (E4M3 elements + E8M0 shared scale per 32 elements) ──
@@ -105,7 +103,6 @@ probe_mxint8_decode(float *out,
                     int n_blocks) {
     int global_idx = threadIdx.x + blockIdx.x * blockDim.x;
     int block_idx = global_idx / 32;
-    int elem_in_block = global_idx % 32;
     if (block_idx >= n_blocks) return;
 
     // Load shared scale (broadcast within warp if block_size=32=warp_size)
@@ -142,7 +139,7 @@ probe_mxfp8_encode(unsigned char *out_elements,
     if (abs_val > 0.0f) {
         int exp;
         frexpf(abs_val, &exp);
-        e8m0 = (unsigned char)min(255, max(0, exp + 127));
+        e8m0 = (unsigned char)min(255, max(0, exp + 126));
         scale = e8m0_to_float(e8m0);
     } else {
         e8m0 = 0;
@@ -157,6 +154,7 @@ probe_mxfp8_encode(unsigned char *out_elements,
     float scaled = val / scale;
     // Clamp to E4M3 range and quantize (simplified)
     scaled = fmaxf(-448.0f, fminf(448.0f, scaled));
-    // Simplified encode: just store clamped value as byte
+    // Simplified placeholder: stores clamped scaled value as byte.
+    // A full E4M3 packer would encode sign/exponent/mantissa bit fields.
     out_elements[block_idx * 32 + elem_in_block] = (unsigned char)(int)roundf(scaled);
 }

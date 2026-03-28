@@ -1,5 +1,9 @@
 
 // NF8 tiled stencil: decode from NF8, apply stencil in FP32, re-encode
+// SASS RE probe -- LUT is intentionally uninitialized here because the
+// probe's purpose is to observe SASS instruction patterns (LDC, binary
+// search structure), not to produce numerically correct output.  The LUT
+// would be populated via cudaMemcpyToSymbol at runtime.
 __constant__ float NF8_STENCIL_LUT[256];
 extern "C" __global__ void __launch_bounds__(128)
 nf8_tile_stencil(unsigned char *out, const unsigned char *in, int nx) {
