@@ -104,17 +104,18 @@ extern "C" __global__ void __launch_bounds__(128)
 probe_cg_grid_sync(float *data, int n, int iterations) {
     auto grid = cg::this_grid();
     int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= n) return;
 
     for (int iter = 0; iter < iterations; iter++) {
-        // Phase 1: compute
-        data[i] = data[i] * 0.999f + 0.001f;
+        // Phase 1: compute (only in-bounds threads touch data)
+        if (i < n) {
+            data[i] = data[i] * 0.999f + 0.001f;
+        }
 
-        // Grid sync: ALL blocks across ALL SMs synchronize here
+        // All threads must participate in grid.sync() to avoid deadlock
         grid.sync();
 
         // Phase 2: read neighbor (safe because grid.sync guarantees visibility)
-        if (i + 1 < n) {
+        if (i < n && i + 1 < n) {
             data[i] = (data[i] + data[i + 1]) * 0.5f;
         }
 

@@ -22,7 +22,7 @@ probe_bar_sync_count(float *out, const float *in) {
     // Only first 128 threads participate in this barrier
     if (threadIdx.x < 128) {
         // Use asm to force a specific barrier ID and count
-        asm volatile("bar.sync 1, 128;");
+        asm volatile("bar.sync 1, 128;" ::: "memory");
     }
     __syncthreads();  // Full block sync after
     out[threadIdx.x + blockIdx.x * 256] = s[threadIdx.x];
@@ -36,9 +36,9 @@ probe_bar_sync_multiple(float *out, const float *in) {
     s[tid] = in[tid + blockIdx.x * 256];
 
     // Barrier 1: first half syncs
-    if (tid < 128) asm volatile("bar.sync 1, 128;");
+    if (tid < 128) asm volatile("bar.sync 1, 128;" ::: "memory");
     // Barrier 2: second half syncs
-    if (tid >= 128) asm volatile("bar.sync 2, 128;");
+    if (tid >= 128) asm volatile("bar.sync 2, 128;" ::: "memory");
 
     // Full sync
     __syncthreads();
@@ -52,13 +52,13 @@ probe_bar_arrive(float *out, const float *in) {
     s[threadIdx.x] = in[threadIdx.x + blockIdx.x * 256];
 
     // Arrive at barrier 3 without waiting (split-phase)
-    asm volatile("bar.arrive 3, 256;");
+    asm volatile("bar.arrive 3, 256;" ::: "memory");
 
     // Do independent work here (no sync needed yet)
     float local = s[threadIdx.x] * 2.0f;
 
     // Now wait for barrier 3
-    asm volatile("bar.sync 3, 256;");
+    asm volatile("bar.sync 3, 256;" ::: "memory");
 
     out[threadIdx.x + blockIdx.x * 256] = local + s[255 - threadIdx.x];
 }

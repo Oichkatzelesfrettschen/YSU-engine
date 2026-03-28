@@ -1,5 +1,5 @@
 
-// Explicit DEPBAR via PTX to control memory ordering without full barrier
+// Explicit named barrier via PTX (bar.arrive/bar.sync)
 extern "C" __global__ void __launch_bounds__(128)
 depbar_explicit(float *out, const float *in, int n) {
     int i=threadIdx.x+blockIdx.x*blockDim.x;

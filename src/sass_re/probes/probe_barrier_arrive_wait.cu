@@ -21,14 +21,14 @@ probe_arrive_wait_producer_consumer(float *out, const float *in, int n) {
         float hi = (base + tid + 128 < n) ? in[base + tid + 128] : 0.0f;
         buf[tid] = lo;
         buf[tid + 128] = hi;
-        asm volatile("bar.arrive 1, 128;");
+        asm volatile("bar.arrive 1, 128;" ::: "memory");
         // Independent producer work keeps the split-phase path alive.
         if (base + tid < n)
             out[base + tid] = lo + hi * 0.125f;
     }
 
     if (tid >= 128) {
-        asm volatile("bar.sync 1, 128;");
+        asm volatile("bar.sync 1, 128;" ::: "memory");
         if (base + tid < n)
             out[base + tid] = buf[tid] * 2.0f;
     }
@@ -54,13 +54,13 @@ probe_arrive_wait_pipeline(float *out, const float *in, int stages) {
 
         if (tid < 128) {
             dst[lane] = in[base + s * 128 + lane];
-            asm volatile("bar.arrive 2, 128;");
+            asm volatile("bar.arrive 2, 128;" ::: "memory");
             // Producer-side independent work keeps arrive and final wait decoupled.
             float scratch = dst[lane] * 0.0625f;
             if (scratch < -1.0e30f)
                 out[base] = scratch;
         } else {
-            asm volatile("bar.sync 2, 128;");
+            asm volatile("bar.sync 2, 128;" ::: "memory");
             float center = src[lane];
             float right = src[(lane + 1) & 127];
             out[base + (s - 1) * 128 + lane] = center * 0.75f + right * 0.25f;
