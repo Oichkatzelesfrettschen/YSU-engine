@@ -6,7 +6,9 @@ dm2_generic_load(float *out, const float *in, int n) {
     int i=threadIdx.x+blockIdx.x*blockDim.x;
     if(i>=n)return;
     float v;
-    // Generic load (compiler decides space based on pointer)
+    // Generic load without address space qualifier is intentional: the probe
+    // tests whether ptxas resolves generic addresses to global LD/ST or keeps
+    // them as generic-space operations in the emitted SASS.
     asm volatile("ld.f32 %0, [%1];":"=f"(v):"l"(&in[i]));
     out[i]=v;
 }
@@ -15,5 +17,6 @@ dm2_generic_store(float *out, const float *in, int n) {
     int i=threadIdx.x+blockIdx.x*blockDim.x;
     if(i>=n)return;
     float v=in[i]*2.0f;
+    // Generic store without address space qualifier is intentional (see above).
     asm volatile("st.f32 [%0], %1;"::"l"(&out[i]),"f"(v));
 }

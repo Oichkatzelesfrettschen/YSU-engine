@@ -1,7 +1,8 @@
 /*
  * SASS RE Probe: Vectorized Load/Store Widths Across All Precisions
- * Isolates: LDG.E.32/64/128, STG.E.32/64/128, LDS.32/64/128
+ * Isolates: LDG.E.32/64/128, STG.E.32/64/128
  *           for every precision type and its x2/x4 vector variants
+ *           (shared memory width probes are in separate LDS/STS files)
  *
  * Ada Lovelace SM 8.9 memory transaction widths:
  *   32-bit:  LDG.E     (float, int, half2, bf162)
@@ -25,8 +26,9 @@
 
 #include <cuda_fp16.h>
 #include <cuda_bf16.h>
+#include <string.h>
 
-/* ── FP32 x1/x2/x4 ─────────────────────────────────── */
+/* -- FP32 x1/x2/x4 ----------------------------------------- */
 extern "C" __global__ void __launch_bounds__(128)
 probe_ldg_f32x1(float *out, const float *in) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -45,7 +47,7 @@ probe_ldg_f32x4(float4 *out, const float4 *in) {
     out[i] = in[i];  // LDG.E.128 + STG.E.128
 }
 
-/* ── FP64 x1/x2 ────────────────────────────────────── */
+/* -- FP64 x1/x2 -------------------------------------------- */
 extern "C" __global__ void __launch_bounds__(128)
 probe_ldg_f64x1(double *out, const double *in) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -58,7 +60,7 @@ probe_ldg_f64x2(double2 *out, const double2 *in) {
     out[i] = in[i];  // LDG.E.128 (double2 = 128-bit)
 }
 
-/* ── FP16 x1/x2/x4 (half, half2, 2xhalf2) ─────────── */
+/* -- FP16 x1/x2/x4 (half, half2, 2xhalf2) ----------------- */
 extern "C" __global__ void __launch_bounds__(128)
 probe_ldg_f16x1(__half *out, const __half *in) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -78,7 +80,7 @@ probe_ldg_f16x4(float2 *out, const float2 *in) {
     out[i] = in[i];  // LDG.E.64
 }
 
-/* ── BF16 x1/x2 ────────────────────────────────────── */
+/* -- BF16 x1/x2 -------------------------------------------- */
 extern "C" __global__ void __launch_bounds__(128)
 probe_ldg_bf16x1(__nv_bfloat16 *out, const __nv_bfloat16 *in) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -94,7 +96,7 @@ probe_ldg_bf16x2(__nv_bfloat162 *out, const __nv_bfloat162 *in) {
     // LDG.E (32-bit: bf162 = 2x16 = 32 bits)
 }
 
-/* ── INT8 x1/x4 (char, char4=uchar4) ───────────────── */
+/* -- INT8 x1/x4 (char, char4=uchar4) ----------------------- */
 extern "C" __global__ void __launch_bounds__(128)
 probe_ldg_i8x1(signed char *out, const signed char *in) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -107,7 +109,7 @@ probe_ldg_i8x4(uchar4 *out, const uchar4 *in) {
     out[i] = in[i];  // LDG.E (32-bit: 4x8 = 32 bits)
 }
 
-/* ── INT16 x1/x2/x4 (short, short2, short4) ────────── */
+/* -- INT16 x1/x2/x4 (short, short2, short4) ---------------- */
 extern "C" __global__ void __launch_bounds__(128)
 probe_ldg_i16x1(short *out, const short *in) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -126,7 +128,7 @@ probe_ldg_i16x4(short4 *out, const short4 *in) {
     out[i] = in[i];  // LDG.E.64 (64-bit: 4x16 = 64 bits)
 }
 
-/* ── INT32 x1/x2/x4 ────────────────────────────────── */
+/* -- INT32 x1/x2/x4 ---------------------------------------- */
 extern "C" __global__ void __launch_bounds__(128)
 probe_ldg_i32x1(int *out, const int *in) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -145,7 +147,7 @@ probe_ldg_i32x4(int4 *out, const int4 *in) {
     out[i] = in[i];  // LDG.E.128
 }
 
-/* ── INT64 x1/x2 ───────────────────────────────────── */
+/* -- INT64 x1/x2 ------------------------------------------- */
 extern "C" __global__ void __launch_bounds__(128)
 probe_ldg_i64x1(long long *out, const long long *in) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;

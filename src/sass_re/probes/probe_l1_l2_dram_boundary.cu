@@ -54,6 +54,7 @@ static void build_random_cycle(int *perm, int n, unsigned seed) {
     }
     // Convert permutation to linked list (cycle)
     int *cycle = (int*)malloc(n * sizeof(int));
+    if (!cycle) return;
     for (int i = 0; i < n - 1; i++) cycle[perm[i]] = perm[i + 1];
     cycle[perm[n-1]] = perm[0];
     for (int i = 0; i < n; i++) perm[i] = cycle[i];

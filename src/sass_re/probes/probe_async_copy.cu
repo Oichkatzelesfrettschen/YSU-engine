@@ -28,6 +28,7 @@
 // Basic cp.async: copy 4 bytes from global to shared
 extern "C" __global__ void __launch_bounds__(128)
 probe_cp_async_basic(float *out, const float *in, int n) {
+#if __CUDA_ARCH__ >= 800
     __shared__ float smem[128];
     int i = threadIdx.x;
 
@@ -39,11 +40,16 @@ probe_cp_async_basic(float *out, const float *in, int n) {
 
     // Use the data from shared memory
     out[i] = smem[i] * 2.0f;
+#else
+    // cp.async requires SM 8.0+ (Ampere); no-op on earlier architectures
+    (void)out; (void)in; (void)n;
+#endif
 }
 
 // cp.async with 16-byte (float4) vectorized transfer
 extern "C" __global__ void __launch_bounds__(128)
 probe_cp_async_vec4(float *out, const float *in, int n) {
+#if __CUDA_ARCH__ >= 800
     __shared__ float smem[512];  // 128 threads * 4 floats
     int i = threadIdx.x;
 
@@ -55,11 +61,15 @@ probe_cp_async_vec4(float *out, const float *in, int n) {
 
     float sum = smem[i * 4] + smem[i * 4 + 1] + smem[i * 4 + 2] + smem[i * 4 + 3];
     out[i] = sum;
+#else
+    (void)out; (void)in; (void)n;
+#endif
 }
 
 // Multi-stage pipeline: overlap copy of next tile with compute on current tile
 extern "C" __global__ void __launch_bounds__(128)
 probe_cp_async_pipeline(float *out, const float *in, int n_tiles) {
+#if __CUDA_ARCH__ >= 800
     __shared__ float smem[2][128];  // Double buffer
     int i = threadIdx.x;
 
@@ -88,4 +98,7 @@ probe_cp_async_pipeline(float *out, const float *in, int n_tiles) {
     __pipeline_wait_prior(0);
     __syncthreads();
     out[(n_tiles - 1) * 128 + i] = smem[(n_tiles - 1) & 1][i] * 2.0f + 1.0f;
+#else
+    (void)out; (void)in; (void)n_tiles;
+#endif
 }

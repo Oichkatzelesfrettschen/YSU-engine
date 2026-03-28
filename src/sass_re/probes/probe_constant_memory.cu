@@ -40,6 +40,10 @@ __constant__ int D3Q19_CY[19] = {
     0, 0, 0, 1,-1, 0, 0, 1,-1, 0, 0, 0, 0,-1, 1, 1,-1, 1,-1
 };
 
+__constant__ int D3Q19_CZ[19] = {
+    0, 0, 0, 0, 0, 1,-1, 0, 0, 1,-1,-1, 1, 0, 0, 0, 0,-1, 1
+};
+
 __constant__ float LARGE_CONST[256];  // For non-broadcast access pattern test
 
 // Broadcast constant read: all threads read same constant array element
@@ -87,7 +91,8 @@ probe_const_lbm_equilibrium(float *feq, const float *rho,
     #pragma unroll
     for (int d = 0; d < 19; d++) {
         float eu = (float)D3Q19_CX[d] * u
-                 + (float)D3Q19_CY[d] * v;
+                 + (float)D3Q19_CY[d] * v
+                 + (float)D3Q19_CZ[d] * w;
         // Horner form: w*rho * ((4.5*eu + 3)*eu + 1 - 1.5*usq)
         float feq_d = D3Q19_W[d] * r * fmaf(fmaf(eu, 4.5f, 3.0f), eu, 1.0f - 1.5f * usq);
         feq[d * n + i] = feq_d;
@@ -100,7 +105,7 @@ probe_const_chain(float *out) {
     int idx = threadIdx.x % 19;
     float acc = 0.0f;
 
-    // Chain: read constant[idx], use result to index next read
+    // Sequential access pattern through all 19 D3Q19 weights
     #pragma unroll 1
     for (int j = 0; j < 512; j++) {
         float w = D3Q19_W[idx];

@@ -5,6 +5,7 @@
 
 #include "../probes/data_movement/probe_cp_async_zfill.cu"
 
+// Simple runner -- leak-on-error is acceptable for probe execution
 #define CHECK_CUDA(expr) do { \
     cudaError_t err__ = (expr); \
     if (err__ != cudaSuccess) { \

@@ -18,7 +18,7 @@
  * at 128^3 (working set >> 48 MB L2), but significant at 64^3.
  *
  * Key SASS instructions:
- *   STG.E.CS   -- streaming store (evict-first L2 policy)
+ *   STG.E.EF   -- streaming store (evict-first L2 policy, SM89 SASS mnemonic)
  *   STG.E.WB   -- write-back store (normal)
  *   STG.E.WT   -- write-through store
  *   LDG.E      -- normal global load
@@ -89,7 +89,9 @@ probe_cache_policy_vectorized(float4 *out_cs, float4 *out_normal,
     // Normal vector store
     out_normal[i] = val;
 
-    // Streaming store requires scalar path (no float4 __stcs overload)
+    // Streaming store requires scalar path (no float4 __stcs overload).
+    // reinterpret_cast<float*> on float4* is safe: float4 is guaranteed
+    // layout-compatible with float[4] under CUDA's memory model.
     __stcs(reinterpret_cast<float*>(out_cs) + i * 4 + 0, v0);
     __stcs(reinterpret_cast<float*>(out_cs) + i * 4 + 1, v1);
     __stcs(reinterpret_cast<float*>(out_cs) + i * 4 + 2, v2);

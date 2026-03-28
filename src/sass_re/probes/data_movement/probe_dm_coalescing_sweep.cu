@@ -1,5 +1,5 @@
 
-// Systematic coalescing test: stride 1, 2, 4, 8, 16, 32
+// Systematic coalescing test: stride 1, 2, 4, 32
 extern "C" __global__ void __launch_bounds__(128)
 dm_coalesce_s1(float *out, const float *in, int n) {
     int i=threadIdx.x+blockIdx.x*blockDim.x;
