@@ -135,6 +135,9 @@ int main(int argc, char **argv) {
                                   log,
                                   &log_size,
                                   &module));
+    if (log_size > 1) {
+        fprintf(stderr, "[optixModuleCreate log] %s\n", log);
+    }
 
     OptixProgramGroupOptions program_group_options = {};
     OptixProgramGroupDesc raygen_desc = {};
@@ -176,6 +179,9 @@ int main(int argc, char **argv) {
                                     log,
                                     &log_size,
                                     &pipeline));
+    if (log_size > 1) {
+        fprintf(stderr, "[optixPipelineCreate log] %s\n", log);
+    }
 
     OptixStackSizes stack_sizes = {};
     CHECK_OPTIX(optixUtilAccumulateStackSizes(raygen_pg, &stack_sizes, pipeline));

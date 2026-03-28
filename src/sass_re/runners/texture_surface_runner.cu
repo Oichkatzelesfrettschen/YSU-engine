@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "../probes/probe_texture_surface.cu"
 #include "../probes/texture_surface/probe_tmu_behavior.cu"
 
 #define CHECK_CUDA(expr) do { \
@@ -353,9 +352,9 @@ static int run_probe_texture_surface(void) {
     cudaArray_t surf_out_arr = NULL;
 
     CHECK_CUDA(cudaMalloc(&d_out, linear_data.size() * sizeof(float)));
-    make_linear_texture(linear_data, &tex_linear, &d_linear);
-    make_array_texture_2d(tex2d_data, 4, 4, cudaFilterModeLinear, cudaAddressModeClamp, &tex2d, &array2d);
-    make_array_texture_3d(tex3d_data, 4, 4, 4, cudaFilterModeLinear, &tex3d, &array3d);
+    if (make_linear_texture(linear_data, &tex_linear, &d_linear)) return 1;
+    if (make_array_texture_2d(tex2d_data, 4, 4, cudaFilterModeLinear, cudaAddressModeClamp, &tex2d, &array2d)) return 1;
+    if (make_array_texture_3d(tex3d_data, 4, 4, 4, cudaFilterModeLinear, &tex3d, &array3d)) return 1;
 
     cudaChannelFormatDesc channel = cudaCreateChannelDesc<float>();
     CHECK_CUDA(cudaMallocArray(&surf_in_arr, &channel, linear_data.size(), 0, cudaArraySurfaceLoadStore));
@@ -364,8 +363,8 @@ static int run_probe_texture_surface(void) {
                                    linear_data.size() * sizeof(float),
                                    linear_data.size() * sizeof(float), 1,
                                    cudaMemcpyHostToDevice));
-    make_surface(surf_in_arr, &surf_in);
-    make_surface(surf_out_arr, &surf_out);
+    if (make_surface(surf_in_arr, &surf_in)) return 1;
+    if (make_surface(surf_out_arr, &surf_out)) return 1;
 
     probe_tex_1d_float<<<1, 32>>>(d_out, tex_linear, 32);
     probe_tex_2d_float<<<dim3(1, 1, 1), dim3(4, 4, 1)>>>(d_out, tex2d, 4, 4);
@@ -406,8 +405,8 @@ static int run_probe_tmu_behavior(void) {
     CHECK_CUDA(cudaMalloc(&d_out, 4096 * sizeof(float)));
     CHECK_CUDA(cudaMalloc(&d_coords1d, 64 * sizeof(float)));
     CHECK_CUDA(cudaMalloc(&d_coords2d, 64 * sizeof(float2)));
-    make_array_texture_1d(data1d, cudaFilterModePoint, cudaAddressModeClamp, &tex1d_point, &arr1d_point);
-    make_array_texture_1d(data1d, cudaFilterModeLinear, cudaAddressModeClamp, &tex1d_linear, &arr1d_linear);
+    if (make_array_texture_1d(data1d, cudaFilterModePoint, cudaAddressModeClamp, &tex1d_point, &arr1d_point)) return 1;
+    if (make_array_texture_1d(data1d, cudaFilterModeLinear, cudaAddressModeClamp, &tex1d_linear, &arr1d_linear)) return 1;
 
     tmu_1d_point<<<1, (unsigned)data1d.size()>>>(d_out, tex1d_point, (int)data1d.size());
     CHECK_CUDA(cudaMemcpy(out1d.data(), d_out, data1d.size() * sizeof(float), cudaMemcpyDeviceToHost));
@@ -435,7 +434,7 @@ static int run_probe_tmu_behavior(void) {
     };
     const char *mode_names[4] = { "clamp", "border", "wrap", "mirror" };
     for (int m = 0; m < 4; ++m) {
-        make_array_texture_1d(data1d, cudaFilterModePoint, modes[m], &addr_tex[m], &addr_arr[m]);
+        if (make_array_texture_1d(data1d, cudaFilterModePoint, modes[m], &addr_tex[m], &addr_arr[m])) return 1;
         tmu_1d_sample_coords<<<1, (unsigned)sample_coords.size()>>>(d_out, addr_tex[m], d_coords1d, (int)sample_coords.size());
         CHECK_CUDA(cudaMemcpy(out1d.data(), d_out, sample_coords.size() * sizeof(float), cudaMemcpyDeviceToHost));
         expect1d.resize(sample_coords.size());
@@ -462,8 +461,8 @@ static int run_probe_tmu_behavior(void) {
     cudaTextureObject_t tex2d_linear = 0;
     cudaArray_t arr2d_point = NULL;
     cudaArray_t arr2d_linear = NULL;
-    make_array_texture_2d(data2d, w2, h2, cudaFilterModePoint, cudaAddressModeClamp, &tex2d_point, &arr2d_point);
-    make_array_texture_2d(data2d, w2, h2, cudaFilterModeLinear, cudaAddressModeClamp, &tex2d_linear, &arr2d_linear);
+    if (make_array_texture_2d(data2d, w2, h2, cudaFilterModePoint, cudaAddressModeClamp, &tex2d_point, &arr2d_point)) return 1;
+    if (make_array_texture_2d(data2d, w2, h2, cudaFilterModeLinear, cudaAddressModeClamp, &tex2d_linear, &arr2d_linear)) return 1;
 
     tmu_2d_point<<<dim3(1, 1, 1), dim3(w2, h2, 1)>>>(d_out, tex2d_point, w2, h2);
     CHECK_CUDA(cudaMemcpy(out2d.data(), d_out, out2d.size() * sizeof(float), cudaMemcpyDeviceToHost));
@@ -503,7 +502,7 @@ static int run_probe_tmu_behavior(void) {
     for (int m = 0; m < 4; ++m) {
         cudaTextureObject_t tex = 0;
         cudaArray_t arr = NULL;
-        make_array_texture_2d(data2d, w2, h2, cudaFilterModePoint, modes[m], &tex, &arr);
+        if (make_array_texture_2d(data2d, w2, h2, cudaFilterModePoint, modes[m], &tex, &arr)) return 1;
         tmu_2d_sample_coords<<<1, (unsigned)sample_uv.size()>>>(d_out, tex, d_coords2d, (int)sample_uv.size());
         CHECK_CUDA(cudaMemcpy(out_addr.data(), d_out, sample_uv.size() * sizeof(float), cudaMemcpyDeviceToHost));
         for (size_t i = 0; i < sample_uv.size(); ++i) {
@@ -534,8 +533,8 @@ static int run_probe_tmu_behavior(void) {
     cudaTextureObject_t tex3d_linear = 0;
     cudaArray_t arr3d_point = NULL;
     cudaArray_t arr3d_linear = NULL;
-    make_array_texture_3d(data3d, w3, h3, d3, cudaFilterModePoint, &tex3d_point, &arr3d_point);
-    make_array_texture_3d(data3d, w3, h3, d3, cudaFilterModeLinear, &tex3d_linear, &arr3d_linear);
+    if (make_array_texture_3d(data3d, w3, h3, d3, cudaFilterModePoint, &tex3d_point, &arr3d_point)) return 1;
+    if (make_array_texture_3d(data3d, w3, h3, d3, cudaFilterModeLinear, &tex3d_linear, &arr3d_linear)) return 1;
 
     tmu_3d_linear<<<1, (unsigned)data3d.size()>>>(d_out, tex3d_linear, w3, h3, d3);
     CHECK_CUDA(cudaMemcpy(out3d.data(), d_out, out3d.size() * sizeof(float), cudaMemcpyDeviceToHost));
@@ -571,8 +570,8 @@ static int run_probe_tmu_behavior(void) {
                                    data1d.size() * sizeof(float),
                                    data1d.size() * sizeof(float), 1,
                                    cudaMemcpyHostToDevice));
-    make_surface(surf1d_arr_in, &surf1d_in);
-    make_surface(surf1d_arr_out, &surf1d_out);
+    if (make_surface(surf1d_arr_in, &surf1d_in)) return 1;
+    if (make_surface(surf1d_arr_out, &surf1d_out)) return 1;
     tmu_surface_1d_copy<<<1, (unsigned)data1d.size()>>>(surf1d_in, surf1d_out, (int)data1d.size());
     std::vector<float> surf1d_out_host(data1d.size());
     CHECK_CUDA(cudaMemcpy2DFromArray(surf1d_out_host.data(),
@@ -586,8 +585,8 @@ static int run_probe_tmu_behavior(void) {
     CHECK_CUDA(cudaMallocArray(&surf2d_arr_out, &channel, w2, h2, cudaArraySurfaceLoadStore));
     CHECK_CUDA(cudaMemcpy2DToArray(surf2d_arr_in, 0, 0, data2d.data(), (size_t)w2 * sizeof(float),
                                    (size_t)w2 * sizeof(float), h2, cudaMemcpyHostToDevice));
-    make_surface(surf2d_arr_in, &surf2d_in);
-    make_surface(surf2d_arr_out, &surf2d_out);
+    if (make_surface(surf2d_arr_in, &surf2d_in)) return 1;
+    if (make_surface(surf2d_arr_out, &surf2d_out)) return 1;
     tmu_surface_2d_copy<<<dim3(1, 1, 1), dim3(w2, h2, 1)>>>(surf2d_in, surf2d_out, w2, h2);
     std::vector<float> surf2d_out_host(data2d.size());
     CHECK_CUDA(cudaMemcpy2DFromArray(surf2d_out_host.data(), (size_t)w2 * sizeof(float), surf2d_arr_out, 0, 0,

@@ -3,7 +3,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lto/dlto_stage_helpers.cuh"
+// Forward declaration of the cross-TU DLTO kernel (defined in a separate
+// translation unit linked at DLTO time).  The header
+// "lto/dlto_stage_helpers.cuh" does not exist; only the kernel symbol is
+// needed here.
+extern "C" __global__ void probe_dlto_cross_tu(float *out,
+                                               const float *a,
+                                               const float *b,
+                                               const float *base,
+                                               int iters,
+                                               uint64_t stride,
+                                               int tail_mask,
+                                               int stage_mask);
 
 static int check_cuda(cudaError_t err, const char *file, int line) {
     if (err != cudaSuccess) {

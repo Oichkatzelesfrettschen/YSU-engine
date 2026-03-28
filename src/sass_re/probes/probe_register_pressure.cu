@@ -28,8 +28,9 @@
 
 // Low register pressure: 16 regs (well within budget)
 extern "C" __global__ void __launch_bounds__(256, 4)
-probe_reg_low(float *out, const float *in) {
+probe_reg_low(float *out, const float *in, int n) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= n) return;
     float a = in[i];
     float b = a * 0.5f;
     float c = b + 1.0f;
