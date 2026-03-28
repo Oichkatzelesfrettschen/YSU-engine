@@ -14,12 +14,18 @@ edge2_kv_atomic(int *out_key, int *out_val, const int *keys, const int *vals, in
         while(my_key>old_key){
             int prev=atomicCAS(&s_key,old_key,my_key);
             if(prev==old_key){
-                s_val=my_val; // Not atomic, but key was successfully CASed
+                // NOTE: Intentional race between s_key CAS and s_val store.
+                // This probe tests the SASS pattern for non-atomic value
+                // updates paired with CAS -- the race is the behavior
+                // being characterized.
+                s_val=my_val;
                 break;
             }
             old_key=prev;
         }
     }
     __syncthreads();
+    // NOTE: Per-block output; global consistency not guaranteed
+    // (probe tests atomicMax SASS pattern).
     if(threadIdx.x==0){atomicMax(out_key,s_key);*out_val=s_val;}
 }
