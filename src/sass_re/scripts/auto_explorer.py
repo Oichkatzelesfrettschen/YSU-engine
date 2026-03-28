@@ -20,7 +20,13 @@ import pathlib
 import re
 import statistics
 import sys
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError:
+        sys.exit("error: Python 3.11+ or 'pip install tomli' required for TOML support")
 
 
 SASS_LINE_RE = re.compile(r"/\*[^*]+\*/\s+([A-Z][A-Z0-9_.]*)")
