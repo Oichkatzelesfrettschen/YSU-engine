@@ -38,16 +38,19 @@ set(LBM_KERNEL_SOURCES
     kernels_fp8_e5m2_soa.cu
     kernels_int8.cu
     kernels_int8_soa.cu
+    kernels_int8_soa_mrt_aa.cu
     kernels_int16.cu
     kernels_int16_soa.cu
     kernels_bf16.cu
     kernels_bf16_soa.cu
+    kernels_bf16_soa_bf162.cu
     kernels_fp32_soa_cs.cu
     kernels_fp64.cu
     kernels_fp64_soa.cu
     kernels_dd.cu
     kernels_int4.cu
     kernels_fp4.cu
+    kernels_inv_tau_precompute.cu
     kernels_tensor_core.cu
     kernels_box_counting.cu
     sparse/kernels_sparse_lbm.cu

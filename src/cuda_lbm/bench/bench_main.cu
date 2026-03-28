@@ -7,10 +7,9 @@
 //   lbm_bench --regression
 //   lbm_bench --occupancy
 
-#include "lbm_kernels.h"
+#include "host_wrappers.h"
 #include "lbm_metrics.h"
 #include "bench_baselines.h"
-#include <cuda_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,9 +23,6 @@ extern void bench_print_result_csv(const BenchResult* r);
 
 // Forward declarations from bench_validate.cu
 extern int validate_all(void);
-
-// Forward declarations from host_wrappers.cu
-extern void report_all_occupancy(int device_id);
 
 // Parse comma-separated grid sizes (e.g., "64,128,256").
 static int parse_grid_sizes(const char* str, int* sizes, int max_sizes) {

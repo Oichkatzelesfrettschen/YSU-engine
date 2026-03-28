@@ -1,40 +1,9 @@
 // Host-side dispatch wrappers for all D3Q19 LBM kernel variants.
 // Provides unified launch interface regardless of precision tier or layout.
 
-#include "lbm_kernels.h"
+#include "host_wrappers.h"
 #include "lbm_metrics.h"
-#include <cuda_runtime.h>
 #include <stdio.h>
-
-// ============================================================================
-// Grid/buffer structs
-// ============================================================================
-
-typedef struct {
-    int nx, ny, nz;
-    int n_cells;
-} LBMGrid;
-
-typedef struct {
-    void* f_a;       // Ping buffer (or single buffer for A-A)
-    void* f_b;       // Pong buffer (NULL for A-A)
-    // DD kernels use 4 buffers: f_a = f_hi_a, f_b = f_lo_a, f_c = f_hi_b, f_d = f_lo_b
-    void* f_c;       // DD pong hi (NULL for non-DD)
-    void* f_d;       // DD pong lo (NULL for non-DD)
-    float* rho;
-    float* u;        // [3 * n_cells] SoA
-    float* tau;
-    float* force;    // [3 * n_cells] SoA
-} LBMBuffers;
-
-static inline LBMGrid lbm_grid_make(int nx, int ny, int nz) {
-    LBMGrid g;
-    g.nx = nx;
-    g.ny = ny;
-    g.nz = nz;
-    g.n_cells = nx * ny * nz;
-    return g;
-}
 
 // ============================================================================
 // Kernel forward declarations
@@ -151,13 +120,21 @@ int launch_lbm_step(
         return cudaErrorInvalidValue;
     }
 
-    // Standard ping-pong: (f_in, f_out, rho, u, tau, force, nx, ny, nz)
-    void* args[] = {
+    // AoS kernels use (force, tau); SoA kernels use (tau, force).
+    // Build args conditionally based on layout from the info table.
+    void* args_soa[] = {
         (void*)&f_in, (void*)&f_out,
         (void*)&bufs->rho, (void*)&bufs->u,
         (void*)&bufs->tau, (void*)&bufs->force,
         (void*)&grid->nx, (void*)&grid->ny, (void*)&grid->nz
     };
+    void* args_aos[] = {
+        (void*)&f_in, (void*)&f_out,
+        (void*)&bufs->rho, (void*)&bufs->u,
+        (void*)&bufs->force, (void*)&bufs->tau,
+        (void*)&grid->nx, (void*)&grid->ny, (void*)&grid->nz
+    };
+    void** args = info->is_soa ? args_soa : args_aos;
 
     // Macro to reduce boilerplate for standard-signature kernels.
     // Each kernel is declared extern and launched via cudaLaunchKernel.
@@ -190,6 +167,7 @@ int launch_lbm_step(
     // BF16
     DISPATCH_STEP(LBM_BF16_AOS,              lbm_step_fused_bf16_kernel,       void)
     DISPATCH_STEP(LBM_BF16_SOA,              lbm_step_bf16_soa_kernel,         void)
+    DISPATCH_STEP(LBM_BF16_SOA_BF162,        lbm_step_bf16_soa_bf162_kernel,   void)
 
     // FP8
     DISPATCH_STEP(LBM_FP8_E4M3_AOS,          lbm_step_fused_fp8_kernel,        void)
@@ -231,9 +209,9 @@ int launch_lbm_init(
     float ux_init, float uy_init, float uz_init,
     cudaStream_t stream
 ) {
-    const LbmKernelInfo* info = &LBM_KERNEL_INFO[variant];
+    (void)&LBM_KERNEL_INFO[variant];
     int n = grid->n_cells;
-    int tpb = 128;  // Init kernels always use 1 thread per cell, 128 tpb
+    int tpb = 128;
     dim3 block(tpb);
     dim3 grd((n + tpb - 1) / tpb);
 
@@ -251,77 +229,130 @@ int launch_lbm_init(
                                 grd, block, args, 0, stream);
     }
 
-    // Standard init: (f, rho, u, rho_init, ux, uy, uz, nx, ny, nz)
-    void* args[] = {
+    // Init kernels have three signatures:
+    //
+    // A) FP32 SoA base: (f, rho, u, rho_init, ux, uy, uz, nx, ny, nz) -- 10 args
+    //    Used by: initialize_uniform_soa_kernel
+    //
+    // B) Tau-extended: (f, rho, u, tau, rho_init, ux, uy, uz, tau_val, nx, ny, nz) -- 12 args
+    //    Used by: most reduced-precision init kernels (FP16, BF16 SoA, FP8, INT8, INT16, FP64 SoA, INT4, FP4, FP32 CS)
+    //
+    // C) Special: BF16 BF162 and INT8 MRT AA have unique signatures handled inline.
+
+    float tau_val = 0.6f;  // Default tau for init
+
+    // 10-arg: (f, rho, u, rho_init, ux, uy, uz, nx, ny, nz)
+    void* args_10[] = {
         (void*)&bufs->f_a,
         (void*)&bufs->rho, (void*)&bufs->u,
         &rho_init, &ux_init, &uy_init, &uz_init,
         (void*)&grid->nx, (void*)&grid->ny, (void*)&grid->nz
     };
 
-    #define DISPATCH_INIT(VARIANT, FUNC_NAME, ELEM_T)                        \
+    // 12-arg: (f, rho, u, tau, rho_init, ux, uy, uz, tau_val, nx, ny, nz)
+    void* args_12[] = {
+        (void*)&bufs->f_a,
+        (void*)&bufs->rho, (void*)&bufs->u,
+        (void*)&bufs->tau,
+        &rho_init, &ux_init, &uy_init, &uz_init,
+        &tau_val,
+        (void*)&grid->nx, (void*)&grid->ny, (void*)&grid->nz
+    };
+
+    #define DISPATCH_INIT_10(VARIANT, FUNC_NAME, ELEM_T)                     \
         case VARIANT: {                                                      \
             extern void FUNC_NAME(ELEM_T*, float*, float*,                   \
                                   float, float, float, float,                \
                                   int, int, int);                            \
             return cudaLaunchKernel((const void*)FUNC_NAME,                  \
-                                   grd, block, args, 0, stream);            \
+                                   grd, block, args_10, 0, stream);         \
+        }
+
+    #define DISPATCH_INIT_12(VARIANT, FUNC_NAME, ELEM_T)                     \
+        case VARIANT: {                                                      \
+            extern void FUNC_NAME(ELEM_T*, float*, float*, float*,           \
+                                  float, float, float, float, float,         \
+                                  int, int, int);                            \
+            return cudaLaunchKernel((const void*)FUNC_NAME,                  \
+                                   grd, block, args_12, 0, stream);         \
         }
 
     switch (variant) {
-    DISPATCH_INIT(LBM_FP32_SOA_FUSED,         initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_MRT_FUSED,     initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_PULL,          initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_MRT_PULL,      initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_TILED,         initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_MRT_TILED,     initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_COARSENED,     initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_MRT_COARSENED, initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_COARSENED_F4,  initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_AA,            initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_MRT_AA,        initialize_uniform_soa_kernel,         float)
-    DISPATCH_INIT(LBM_FP32_SOA_CS,            initialize_uniform_fp32_soa_cs_kernel, float)
+    // FP32 SoA: 10-arg (no tau in init)
+    DISPATCH_INIT_10(LBM_FP32_SOA_FUSED,         initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_MRT_FUSED,     initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_PULL,          initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_MRT_PULL,      initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_TILED,         initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_MRT_TILED,     initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_COARSENED,     initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_MRT_COARSENED, initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_COARSENED_F4,  initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_AA,            initialize_uniform_soa_kernel,         float)
+    DISPATCH_INIT_10(LBM_FP32_SOA_MRT_AA,        initialize_uniform_soa_kernel,         float)
 
-    DISPATCH_INIT(LBM_FP16_AOS,              initialize_uniform_fp16_kernel,         void)
-    DISPATCH_INIT(LBM_FP16_SOA,              initialize_uniform_fp16_soa_kernel,     void)
-    DISPATCH_INIT(LBM_FP16_SOA_HALF2,        initialize_uniform_fp16_soa_half2_kernel, void)
+    // FP32 CS: 12-arg (tau-extended)
+    DISPATCH_INIT_12(LBM_FP32_SOA_CS,            initialize_uniform_fp32_soa_cs_kernel, float)
 
-    DISPATCH_INIT(LBM_BF16_AOS,              initialize_uniform_bf16_kernel,         void)
-    DISPATCH_INIT(LBM_BF16_SOA,              initialize_uniform_bf16_soa_kernel,     void)
+    // FP16: 12-arg
+    DISPATCH_INIT_12(LBM_FP16_AOS,              initialize_uniform_fp16_kernel,         void)
+    DISPATCH_INIT_12(LBM_FP16_SOA,              initialize_uniform_fp16_soa_kernel,     void)
+    DISPATCH_INIT_12(LBM_FP16_SOA_HALF2,        initialize_uniform_fp16_soa_half2_kernel, void)
 
-    DISPATCH_INIT(LBM_FP8_E4M3_AOS,          initialize_uniform_fp8_kernel,          void)
-    DISPATCH_INIT(LBM_FP8_E4M3_SOA,          initialize_uniform_fp8_soa_kernel,      void)
-    DISPATCH_INIT(LBM_FP8_E5M2_AOS,          initialize_uniform_fp8e5m2_kernel,      void)
-    DISPATCH_INIT(LBM_FP8_E5M2_SOA,          initialize_uniform_fp8_e5m2_soa_kernel, void)
+    // BF16 AoS: 10-arg (no tau)
+    DISPATCH_INIT_10(LBM_BF16_AOS,              initialize_uniform_bf16_kernel,         void)
+    // BF16 SoA: 12-arg
+    DISPATCH_INIT_12(LBM_BF16_SOA,              initialize_uniform_bf16_soa_kernel,     void)
 
-    DISPATCH_INIT(LBM_INT8_AOS,              initialize_uniform_int8_kernel,         void)
-    DISPATCH_INIT(LBM_INT8_SOA,              initialize_uniform_int8_soa_kernel,     void)
+    // BF16 SoA BF162: special signature (f_a, f_b, rho, u, tau, force, rho_init, ux, uy, uz, nx, ny, nz)
+    case LBM_BF16_SOA_BF162: {
+        extern void initialize_uniform_bf16_soa_bf162_kernel(
+            void*, void*, float*, float*, float*, float*,
+            float, float, float, float, int, int, int);
+        void* args_bf162[] = {
+            (void*)&bufs->f_a, (void*)&bufs->f_b,
+            (void*)&bufs->rho, (void*)&bufs->u,
+            (void*)&bufs->tau, (void*)&bufs->force,
+            &rho_init, &ux_init, &uy_init, &uz_init,
+            (void*)&grid->nx, (void*)&grid->ny, (void*)&grid->nz
+        };
+        return cudaLaunchKernel((const void*)initialize_uniform_bf16_soa_bf162_kernel,
+                                grd, block, args_bf162, 0, stream);
+    }
 
-    DISPATCH_INIT(LBM_INT16_AOS,             initialize_uniform_int16_kernel,        void)
-    DISPATCH_INIT(LBM_INT16_SOA,             initialize_uniform_int16_soa_kernel,    void)
+    // FP8: 12-arg
+    DISPATCH_INIT_12(LBM_FP8_E4M3_AOS,          initialize_uniform_fp8_kernel,          void)
+    DISPATCH_INIT_12(LBM_FP8_E4M3_SOA,          initialize_uniform_fp8_soa_kernel,      void)
+    DISPATCH_INIT_12(LBM_FP8_E5M2_AOS,          initialize_uniform_fp8e5m2_kernel,      void)
+    DISPATCH_INIT_12(LBM_FP8_E5M2_SOA,          initialize_uniform_fp8_e5m2_soa_kernel, void)
 
-    DISPATCH_INIT(LBM_FP64_AOS,              initialize_uniform_fp64_kernel,         void)
-    DISPATCH_INIT(LBM_FP64_SOA,              initialize_uniform_fp64_soa_kernel,     void)
+    // INT8: 12-arg
+    DISPATCH_INIT_12(LBM_INT8_AOS,              initialize_uniform_int8_kernel,         void)
+    DISPATCH_INIT_12(LBM_INT8_SOA,              initialize_uniform_int8_soa_kernel,     void)
 
-    DISPATCH_INIT(LBM_INT4_SOA,              initialize_uniform_int4_kernel,         void)
-    DISPATCH_INIT(LBM_FP4_SOA,               initialize_uniform_fp4_kernel,          void)
+    // INT16: 12-arg
+    DISPATCH_INIT_12(LBM_INT16_AOS,             initialize_uniform_int16_kernel,        void)
+    DISPATCH_INIT_12(LBM_INT16_SOA,             initialize_uniform_int16_soa_kernel,    void)
+
+    // FP64 AoS: 10-arg (no tau)
+    DISPATCH_INIT_10(LBM_FP64_AOS,              initialize_uniform_fp64_kernel,         void)
+    // FP64 SoA: 12-arg
+    DISPATCH_INIT_12(LBM_FP64_SOA,              initialize_uniform_fp64_soa_kernel,     void)
+
+    // BW ceiling: 12-arg
+    DISPATCH_INIT_12(LBM_INT4_SOA,              initialize_uniform_int4_kernel,         void)
+    DISPATCH_INIT_12(LBM_FP4_SOA,               initialize_uniform_fp4_kernel,          void)
 
     default:
         return cudaErrorInvalidValue;
     }
-    #undef DISPATCH_INIT
+    #undef DISPATCH_INIT_10
+    #undef DISPATCH_INIT_12
 }
 
 // ============================================================================
 // Occupancy queries
 // ============================================================================
-
-typedef struct {
-    LbmKernelVariant variant;
-    int max_active_blocks;
-    int max_warps;
-    float occupancy_pct;
-} OccupancyInfo;
 
 // Query occupancy for a single variant on the current device.
 int query_occupancy(LbmKernelVariant variant, int device_id, OccupancyInfo* out) {

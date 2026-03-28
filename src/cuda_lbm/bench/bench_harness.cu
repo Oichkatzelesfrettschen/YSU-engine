@@ -2,10 +2,9 @@
 // Uses CUDA events for sub-ms timing precision.
 // Annotates with NVTX ranges for nsys integration.
 
-#include "lbm_kernels.h"
+#include "host_wrappers.h"
 #include "lbm_metrics.h"
 #include "bench_baselines.h"
-#include <cuda_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,14 +17,6 @@
 #define NVTX_PUSH(msg) ((void)0)
 #define NVTX_POP()     ((void)0)
 #endif
-
-// Forward declarations from host_wrappers.cu
-extern int launch_lbm_step(LbmKernelVariant variant, const void* grid,
-                           void* bufs, const void* f_in, void* f_out,
-                           int parity, cudaStream_t stream);
-extern int launch_lbm_init(LbmKernelVariant variant, const void* grid,
-                           void* bufs, float rho, float ux, float uy, float uz,
-                           cudaStream_t stream);
 
 // Allocate LBM buffers for a given variant and grid size.
 // Returns 0 on success, nonzero if VRAM insufficient.
@@ -145,14 +136,12 @@ BenchResult bench_run_variant(
     result.vram_bytes = vram;
 
     // Build grid and buffer structs for host_wrappers
-    typedef struct { int nx, ny, nz, n_cells; } LBMGrid;
-    typedef struct { void *f_a, *f_b, *f_c, *f_d; float *rho, *u, *tau, *force; } LBMBuffers;
 
     LBMGrid grid = {nx, ny, nz, (int)n_cells};
     LBMBuffers bufs = {f_a, f_b, f_c, f_d, rho, u, tau_d, force_d};
 
     // Initialize
-    launch_lbm_init(variant, (const void*)&grid, (void*)&bufs,
+    launch_lbm_init(variant, &grid, &bufs,
                     1.0f, 0.0f, 0.0f, 0.0f, 0);
     cudaDeviceSynchronize();
 
@@ -160,12 +149,12 @@ BenchResult bench_run_variant(
     NVTX_PUSH("warmup");
     for (int s = 0; s < warmup_steps; s++) {
         if (info->is_aa) {
-            launch_lbm_step(variant, (const void*)&grid, (void*)&bufs,
+            launch_lbm_step(variant, &grid, &bufs,
                            NULL, NULL, s % 2, 0);
         } else {
             void* in  = (s % 2 == 0) ? f_a : f_b;
             void* out = (s % 2 == 0) ? f_b : f_a;
-            launch_lbm_step(variant, (const void*)&grid, (void*)&bufs,
+            launch_lbm_step(variant, &grid, &bufs,
                            in, out, 0, 0);
         }
     }
@@ -185,12 +174,12 @@ BenchResult bench_run_variant(
     for (int s = 0; s < timing_steps; s++) {
         int total_s = warmup_steps + s;
         if (info->is_aa) {
-            launch_lbm_step(variant, (const void*)&grid, (void*)&bufs,
+            launch_lbm_step(variant, &grid, &bufs,
                            NULL, NULL, total_s % 2, 0);
         } else {
             void* in  = (total_s % 2 == 0) ? f_a : f_b;
             void* out = (total_s % 2 == 0) ? f_b : f_a;
-            launch_lbm_step(variant, (const void*)&grid, (void*)&bufs,
+            launch_lbm_step(variant, &grid, &bufs,
                            in, out, 0, 0);
         }
     }

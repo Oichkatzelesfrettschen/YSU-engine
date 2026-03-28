@@ -4,20 +4,20 @@
 // Solves 1024^3 in 12GB VRAM by eliminating the ping-pong buffer (A-A pattern)
 // and allocating only active 8x8x8 bricks.
 
-__constant__ int CX[19] = {
+static __constant__ int CX[19] = {
     0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 1, -1, 1, -1, 0, 0, 0, 0
 };
-__constant__ int CY[19] = {
+static __constant__ int CY[19] = {
     0, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 0, 0, 1, -1, 1, -1
 };
-__constant__ int CZ[19] = {
+static __constant__ int CZ[19] = {
     0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 1, -1, -1, 1, 1, -1, -1, 1
 };
-__constant__ int OPP[19] = {
+static __constant__ int OPP[19] = {
     0,  2,  1,  4,  3,  6,  5,  8,  7, 10,
     9, 12, 11, 14, 13, 16, 15, 18, 17
 };
-__constant__ float W[19] = {
+static __constant__ float W[19] = {
     1.0f/3.0f,
     1.0f/18.0f, 1.0f/18.0f, 1.0f/18.0f,
     1.0f/18.0f, 1.0f/18.0f, 1.0f/18.0f,

@@ -11,37 +11,25 @@
 //
 // Grid: 64^3 (fast enough for CI, large enough for shear instability).
 
-#include "lbm_kernels.h"
+#include "host_wrappers.h"
 #include "lbm_metrics.h"
-#include <cuda_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
-// Forward declarations from host_wrappers.cu
-extern int launch_lbm_step(LbmKernelVariant variant, const void* grid,
-                           void* bufs, const void* f_in, void* f_out,
-                           int parity, cudaStream_t stream);
-extern int launch_lbm_init(LbmKernelVariant variant, const void* grid,
-                           void* bufs, float rho, float ux, float uy, float uz,
-                           cudaStream_t stream);
-
-typedef struct { int nx, ny, nz, n_cells; } TestGrid;
-typedef struct { void *f_a, *f_b, *f_c, *f_d; float *rho, *u, *tau, *force; } TestBuffers;
 
 // Initialize a double shear layer: u_x = +0.3 for y > ny/2, u_x = -0.3 for y <= ny/2.
 // Uses the FP32 SoA init kernel for equilibrium, then injects velocity via
 // custom host-side initialization.
 static void init_double_shear(
     LbmKernelVariant variant,
-    TestGrid* grid,
-    TestBuffers* bufs
+    LBMGrid* grid,
+    LBMBuffers* bufs
 ) {
     int nx = grid->nx, ny = grid->ny, nz = grid->nz;
     size_t n = (size_t)grid->n_cells;
 
     // First init to quiescent equilibrium
-    launch_lbm_init(variant, (const void*)grid, (void*)bufs,
+    launch_lbm_init(variant, grid, bufs,
                     1.0f, 0.0f, 0.0f, 0.0f, 0);
     cudaDeviceSynchronize();
 
@@ -92,7 +80,7 @@ static int check_blowup(float* d_rho, size_t n, float threshold) {
 }
 
 // Allocate buffers for a given FP32 SoA variant.
-static void alloc_fp32_soa(TestGrid* grid, TestBuffers* bufs) {
+static void alloc_fp32_soa(LBMGrid* grid, LBMBuffers* bufs) {
     size_t n = (size_t)grid->n_cells;
     size_t per_buf = 19 * n * sizeof(float);
 
@@ -114,7 +102,7 @@ static void alloc_fp32_soa(TestGrid* grid, TestBuffers* bufs) {
     cudaMemset(bufs->force, 0, n * 3 * sizeof(float));
 }
 
-static void free_test_bufs(TestBuffers* bufs) {
+static void free_test_bufs(LBMBuffers* bufs) {
     if (bufs->f_a) cudaFree(bufs->f_a);
     if (bufs->f_b) cudaFree(bufs->f_b);
     if (bufs->f_c) cudaFree(bufs->f_c);
@@ -132,13 +120,13 @@ int test_mrt_stability(void) {
     printf("Grid: 64^3, tau=0.55, double shear layer (u=+-0.3c)\n\n");
 
     int nx = 64, ny = 64, nz = 64;
-    TestGrid grid = {nx, ny, nz, nx * ny * nz};
+    LBMGrid grid = {nx, ny, nz, nx * ny * nz};
     int failures = 0;
 
     // ---- Part 1: BGK should blow up ----
     printf("Part 1: BGK collision (expect NaN within 500 steps) ...\n");
     {
-        TestBuffers bufs;
+        LBMBuffers bufs;
         alloc_fp32_soa(&grid, &bufs);
         init_double_shear(LBM_FP32_SOA_FUSED, &grid, &bufs);
 
@@ -147,7 +135,7 @@ int test_mrt_stability(void) {
         for (int s = 0; s < 500; s++) {
             void* in  = (s % 2 == 0) ? bufs.f_a : bufs.f_b;
             void* out = (s % 2 == 0) ? bufs.f_b : bufs.f_a;
-            launch_lbm_step(LBM_FP32_SOA_FUSED, (const void*)&grid, (void*)&bufs,
+            launch_lbm_step(LBM_FP32_SOA_FUSED, &grid, &bufs,
                            in, out, 0, 0);
 
             // Check every 50 steps
@@ -184,7 +172,7 @@ int test_mrt_stability(void) {
     // ---- Part 2: MRT should survive ----
     printf("\nPart 2: MRT collision (expect stable after 2000 steps) ...\n");
     {
-        TestBuffers bufs;
+        LBMBuffers bufs;
         alloc_fp32_soa(&grid, &bufs);
         init_double_shear(LBM_FP32_SOA_MRT_FUSED, &grid, &bufs);
 
@@ -192,7 +180,7 @@ int test_mrt_stability(void) {
         for (int s = 0; s < 2000; s++) {
             void* in  = (s % 2 == 0) ? bufs.f_a : bufs.f_b;
             void* out = (s % 2 == 0) ? bufs.f_b : bufs.f_a;
-            launch_lbm_step(LBM_FP32_SOA_MRT_FUSED, (const void*)&grid, (void*)&bufs,
+            launch_lbm_step(LBM_FP32_SOA_MRT_FUSED, &grid, &bufs,
                            in, out, 0, 0);
 
             // Check every 200 steps

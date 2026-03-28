@@ -1,21 +1,12 @@
 // Physics correctness validation for LBM kernels.
 // Runs quiescent simulations and checks conservation laws.
 
-#include "lbm_kernels.h"
+#include "host_wrappers.h"
 #include "lbm_metrics.h"
-#include <cuda_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-
-// Forward declarations from host_wrappers.cu
-extern int launch_lbm_step(LbmKernelVariant variant, const void* grid,
-                           void* bufs, const void* f_in, void* f_out,
-                           int parity, cudaStream_t stream);
-extern int launch_lbm_init(LbmKernelVariant variant, const void* grid,
-                           void* bufs, float rho, float ux, float uy, float uz,
-                           cudaStream_t stream);
 
 // Precision-specific tolerances for conservation checks.
 static float get_tolerance(LbmKernelVariant v) {
@@ -72,8 +63,6 @@ ValidationResult validate_kernel(LbmKernelVariant variant) {
 
     // DD is capped at 64^3 in benchmarks but we use 32^3 here
     // Allocate buffers
-    typedef struct { int nx, ny, nz, n_cells; } LBMGrid;
-    typedef struct { void *f_a, *f_b, *f_c, *f_d; float *rho, *u, *tau, *force; } LBMBuffers;
 
     void *f_a = NULL, *f_b = NULL, *f_c = NULL, *f_d = NULL;
     float *rho = NULL, *u = NULL, *tau_d = NULL, *force_d = NULL;
@@ -120,7 +109,7 @@ ValidationResult validate_kernel(LbmKernelVariant variant) {
     LBMBuffers bufs = {f_a, f_b, f_c, f_d, rho, u, tau_d, force_d};
 
     // Initialize to equilibrium (rho=1, u=0)
-    launch_lbm_init(variant, (const void*)&grid, (void*)&bufs,
+    launch_lbm_init(variant, &grid, &bufs,
                     1.0f, 0.0f, 0.0f, 0.0f, 0);
     cudaDeviceSynchronize();
 
@@ -134,12 +123,12 @@ ValidationResult validate_kernel(LbmKernelVariant variant) {
     // Run steps
     for (int s = 0; s < vr.steps; s++) {
         if (info->is_aa) {
-            launch_lbm_step(variant, (const void*)&grid, (void*)&bufs,
+            launch_lbm_step(variant, &grid, &bufs,
                            NULL, NULL, s % 2, 0);
         } else {
             void* in  = (s % 2 == 0) ? f_a : f_b;
             void* out = (s % 2 == 0) ? f_b : f_a;
-            launch_lbm_step(variant, (const void*)&grid, (void*)&bufs,
+            launch_lbm_step(variant, &grid, &bufs,
                            in, out, 0, 0);
         }
     }

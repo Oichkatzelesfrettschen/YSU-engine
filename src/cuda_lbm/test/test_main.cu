@@ -2,6 +2,7 @@
 // No external test framework dependency.
 
 #include <cuda_runtime.h>
+#include <cstring>
 #include <stdio.h>
 
 // Forward declarations from test files
