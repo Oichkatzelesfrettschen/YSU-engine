@@ -8,9 +8,10 @@ edge2_ballot_cond(int *out, const float *in, float lo, float hi, int n) {
     int gi=blockIdx.x*blockDim.x+threadIdx.x;
     if(gi<n){
         float v=in[gi];
-        unsigned in_range=__ballot_sync(0xFFFFFFFF,v>=lo&&v<=hi);
-        unsigned below=__ballot_sync(0xFFFFFFFF,v<lo);
-        unsigned above=__ballot_sync(0xFFFFFFFF,v>hi);
+        unsigned active=__activemask();
+        unsigned in_range=__ballot_sync(active,v>=lo&&v<=hi);
+        unsigned below=__ballot_sync(active,v<lo);
+        unsigned above=__ballot_sync(active,v>hi);
         // Only lane 0 does atomic (3 bins)
         if((threadIdx.x&31)==0){
             atomicAdd(&s_in_range,__popc(in_range));
