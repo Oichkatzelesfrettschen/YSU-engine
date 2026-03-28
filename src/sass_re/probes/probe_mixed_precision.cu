@@ -44,7 +44,6 @@ probe_mixed_fp16_fp32(__half *dist, int n_cells) {
     float rho = 0.0f;
     #pragma unroll
     for (int d = 0; d < 19; d++) rho += f[d];
-    float inv_rho = 1.0f / rho;
     float tau_inv = 1.0f / 0.6f;
     #pragma unroll
     for (int d = 0; d < 19; d++) {

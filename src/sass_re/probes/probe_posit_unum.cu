@@ -26,7 +26,7 @@
 // Posit<8,0> decode: 8 bits -> float
 __device__ __forceinline__ float posit8_decode(unsigned char p) {
     if (p == 0) return 0.0f;
-    if (p == 0x80) return 1.0f / 0.0f;  // NaR (Not a Real)
+    if (p == 0x80) return __int_as_float(0x7FC00001);  // NaR (Not a Real) -> quiet NaN
 
     int sign = (p >> 7) & 1;
     unsigned char abs_p = sign ? (~p + 1) : p;  // Two's complement for negative
